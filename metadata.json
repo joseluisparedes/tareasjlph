@@ -1,0 +1,5 @@
+{
+  "name": "BRM IT Task Manager",
+  "description": "A unified dashboard for IT requirement management, featuring Kanban/Table views, advanced filtering, administration, and reporting.",
+  "requestFramePermissions": []
+}
