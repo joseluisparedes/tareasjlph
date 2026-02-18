@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ITRequest, Status, Priority } from '../../types';
+import { ITRequest, Status, Priority, CatalogoItem } from '../../types';
 import { MOCK_USERS } from '../../data/constants';
 import { Calendar, User, AlertCircle, CheckCircle2, Clock, Code, TestTube } from 'lucide-react';
 
@@ -7,19 +7,29 @@ interface KanbanBoardProps {
     requests: ITRequest[];
     onEdit: (request: ITRequest) => void;
     onStatusChange: (requestId: string, newStatus: Status) => void;
+    catalogosPrioridad?: CatalogoItem[];
 }
 
-const getPriorityColor = (priority: Priority) => {
+const getPriorityStyle = (priority: Priority, catalogos?: CatalogoItem[]) => {
+    const cat = catalogos?.find(c => c.valor === priority && c.esta_activo);
+    if (cat?.color) {
+        return {
+            backgroundColor: `${cat.color}20`,
+            color: cat.color,
+            borderColor: `${cat.color}30`,
+        };
+    }
+
     switch (priority) {
-        case Priority.Critical: return 'bg-red-100 text-red-700 border-red-200';
-        case Priority.High: return 'bg-orange-100 text-orange-700 border-orange-200';
-        case Priority.Medium: return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-        case Priority.Low: return 'bg-green-100 text-green-700 border-green-200';
-        default: return 'bg-slate-100 text-slate-600';
+        case Priority.Critical: return { backgroundColor: '#fee2e2', color: '#b91c1c', borderColor: '#fecaca' }; // red-100, red-700, red-200
+        case Priority.High: return { backgroundColor: '#ffedd5', color: '#c2410c', borderColor: '#fed7aa' }; // orange-100, orange-700, orange-200
+        case Priority.Medium: return { backgroundColor: '#fef9c3', color: '#a16207', borderColor: '#fde047' }; // yellow-100, yellow-700, yellow-200
+        case Priority.Low: return { backgroundColor: '#dcfce7', color: '#15803d', borderColor: '#bbf7d0' }; // green-100, green-700, green-200
+        default: return { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' };
     }
 };
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onStatusChange }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onStatusChange, catalogosPrioridad }) => {
     const columns = Object.values(Status);
     const [dragOverColumn, setDragOverColumn] = useState<Status | null>(null);
 
@@ -92,7 +102,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
                                     >
                                         <div className="flex justify-between items-start mb-2">
                                             <span className="text-[10px] font-mono text-slate-400">{req.id}</span>
-                                            <span className={`text-[10px] px-2 py-0.5 rounded border font-medium ${getPriorityColor(req.priority)}`}>
+                                            <span
+                                                className="text-[10px] px-2 py-0.5 rounded border font-medium"
+                                                style={getPriorityStyle(req.priority, catalogosPrioridad)}
+                                            >
                                                 {req.priority}
                                             </span>
                                         </div>

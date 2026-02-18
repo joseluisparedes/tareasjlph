@@ -7,15 +7,18 @@ interface SidebarProps {
     onChangeView: (view: ViewMode) => void;
     isOpen: boolean;
     toggleSidebar: () => void;
+    esAdministrador?: boolean;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isOpen, toggleSidebar }) => {
-    const navItems: { view: ViewMode; label: string; icon: React.ReactNode }[] = [
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isOpen, toggleSidebar, esAdministrador }) => {
+    const todosLosItems: { view: ViewMode; label: string; icon: React.ReactNode; soloAdmin?: boolean }[] = [
         { view: 'Dashboard', label: 'Tablero', icon: <LayoutDashboard size={20} /> },
         { view: 'Reports', label: 'Reportes', icon: <BarChart3 size={20} /> },
         { view: 'Integrations', label: 'Integraciones', icon: <LinkIcon size={20} /> },
-        { view: 'Admin', label: 'Admin', icon: <Settings size={20} /> },
+        { view: 'Admin', label: 'Admin', icon: <Settings size={20} />, soloAdmin: true },
     ];
+
+    const navItems = todosLosItems.filter(item => !item.soloAdmin || esAdministrador);
 
     return (
         <aside className={`bg-slate-900 text-white flex flex-col h-screen fixed left-0 top-0 z-10 shadow-xl transition-all duration-300 ${isOpen ? 'w-64' : 'w-20'}`}>

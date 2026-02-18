@@ -6,11 +6,15 @@ import { AdminPanel } from './components/admin/AdminPanel';
 import { Reports } from './components/dashboard/Reports';
 import { Integrations } from './components/dashboard/Integrations';
 import { AuthPage } from './components/auth/AuthPage';
-import { ITRequest, ViewMode, CatalogItem, RequestType, Priority, Status } from './types/index';
+import { ITRequest, ViewMode, CatalogItem, RequestType, Priority, Status } from './types';
 import { useSolicitudes } from './hooks/useSolicitudes';
 import { useDominios } from './hooks/useDominios';
+import { useCatalogos } from './hooks/useCatalogos';
+import { useCatalogoConfig } from './hooks/useCatalogoConfig';
 import { useAuth } from './hooks/useAuth';
-import type { Solicitud, Dominio } from './lib/supabase/tipos-bd';
+import type { Solicitud, Dominio, SolicitudFecha } from './lib/supabase/tipos-bd';
+import type { CatalogType } from './types';
+import { fechasApi } from './lib/api/fechas';
 import { LogOut, Loader2 } from 'lucide-react';
 
 // Adaptadores: convierte tipos de Supabase a tipos del frontend
@@ -28,6 +32,18 @@ function adaptarSolicitud(s: Solicitud, dominios: Dominio[]): ITRequest {
         assigneeId: s.asignado_a,
         createdAt: s.fecha_creacion,
         externalId: s.id_externo ?? undefined,
+        // Campos adicionales
+        prioridadNegocio: s.prioridad_negocio ?? undefined,
+        tareaSN: s.tarea_sn ?? undefined,
+        ticketRIT: s.ticket_rit ?? undefined,
+        fechaInicio: s.fecha_inicio ?? undefined,
+        fechaFin: s.fecha_fin ?? undefined,
+        // Nuevos campos del catálogo
+        direccionSolicitante: s.direccion_solicitante ?? undefined,
+        brm: s.brm ?? undefined,
+        institucion: s.institucion ?? undefined,
+        tipoTarea: s.tipo_tarea ?? undefined,
+        complejidad: s.complejidad ?? undefined,
     };
 }
 
@@ -40,11 +56,15 @@ function adaptarDominio(d: Dominio): CatalogItem {
 }
 
 export default function App() {
-    const { user, cargando: cargandoAuth, cerrarSesion } = useAuth();
+    const { user, perfil, cargando: cargandoAuth, cerrarSesion, esAdministrador } = useAuth();
     const [currentView, setCurrentView] = useState<ViewMode>('Dashboard');
+
+    // Redirigir a Dashboard si un Colaborador intenta acceder a Admin
+    const vistaSegura: ViewMode = !esAdministrador && currentView === 'Admin' ? 'Dashboard' : currentView;
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRequest, setEditingRequest] = useState<ITRequest | null>(null);
+    const [historialFechas, setHistorialFechas] = useState<SolicitudFecha[]>([]);
 
     const {
         solicitudes,
@@ -60,6 +80,15 @@ export default function App() {
         crearDominio,
         actualizarDominio,
     } = useDominios();
+
+    const {
+        catalogos,
+        crearItem: crearCatalogo,
+        actualizarItem: actualizarCatalogo,
+        eliminarItem: eliminarCatalogo,
+    } = useCatalogos();
+
+    const { getModo, setModo } = useCatalogoConfig();
 
     // Pantalla de carga inicial
     if (cargandoAuth) {
@@ -84,12 +113,20 @@ export default function App() {
 
     const handleOpenNewRequest = () => {
         setEditingRequest(null);
+        setHistorialFechas([]);
         setIsModalOpen(true);
     };
 
-    const handleEditRequest = (req: ITRequest) => {
+    const handleEditRequest = async (req: ITRequest) => {
         setEditingRequest(req);
         setIsModalOpen(true);
+        // Cargar historial de fechas de esta solicitud
+        try {
+            const historial = await fechasApi.obtenerPorSolicitud(req.id);
+            setHistorialFechas(historial);
+        } catch {
+            setHistorialFechas([]);
+        }
     };
 
     const handleSaveRequest = async (req: ITRequest) => {
@@ -104,16 +141,49 @@ export default function App() {
             solicitante: req.requester,
             prioridad: req.priority as Solicitud['prioridad'],
             estado: req.status as Solicitud['estado'],
-            asignado_a: req.assigneeId ?? null,
+            asignado_a: req.assigneeId || null,
             fecha_vencimiento: null,
-            id_externo: req.externalId ?? null,
+            id_externo: req.externalId || null,
             creado_por: user.id,
+            prioridad_negocio: req.prioridadNegocio || null,
+            tarea_sn: req.tareaSN || null,
+            ticket_rit: req.ticketRIT || null,
+            fecha_inicio: req.fechaInicio || null,
+            fecha_fin: req.fechaFin || null,
+            // Nuevos campos del catálogo
+            direccion_solicitante: req.direccionSolicitante || null,
+            brm: req.brm || null,
+            institucion: req.institucion || null,
+            tipo_tarea: req.tipoTarea || null,
+            complejidad: req.complejidad || null,
         };
 
         if (solicitudes.some(s => s.id === req.id)) {
+            // Detectar cambios de fecha y registrar historial
+            const solicitudAnterior = solicitudes.find(s => s.id === req.id);
+            if (solicitudAnterior) {
+                const fechaInicioAnterior = solicitudAnterior.fecha_inicio;
+                const fechaFinAnterior = solicitudAnterior.fecha_fin;
+                const nuevaFechaInicio = datos.fecha_inicio;
+                const nuevaFechaFin = datos.fecha_fin;
+
+                if (nuevaFechaInicio && nuevaFechaInicio !== fechaInicioAnterior) {
+                    await fechasApi.registrar(req.id, 'inicio', nuevaFechaInicio, user.id);
+                }
+                if (nuevaFechaFin && nuevaFechaFin !== fechaFinAnterior) {
+                    await fechasApi.registrar(req.id, 'fin', nuevaFechaFin, user.id);
+                }
+            }
             await actualizarSolicitud(req.id, datos);
         } else {
-            await crearSolicitud(datos);
+            const nueva = await crearSolicitud(datos);
+            // Registrar fechas iniciales si se proporcionaron
+            if (datos.fecha_inicio) {
+                await fechasApi.registrar(nueva.id, 'inicio', datos.fecha_inicio, user.id);
+            }
+            if (datos.fecha_fin) {
+                await fechasApi.registrar(nueva.id, 'fin', datos.fecha_fin, user.id);
+            }
         }
         setIsModalOpen(false);
     };
@@ -142,10 +212,11 @@ export default function App() {
     return (
         <div className="flex h-screen bg-slate-50">
             <Sidebar
-                currentView={currentView}
+                currentView={vistaSegura}
                 onChangeView={setCurrentView}
                 isOpen={isSidebarOpen}
                 toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+                esAdministrador={esAdministrador}
             />
 
             <main
@@ -154,19 +225,19 @@ export default function App() {
                 <header className="mb-4 flex-shrink-0 flex items-start justify-between">
                     <div>
                         <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
-                            {currentView === 'Dashboard' && 'Tablero Unificado de Tareas'}
-                            {currentView === 'Admin' && 'Administración del Sistema'}
-                            {currentView === 'Reports' && 'Reportes y Analítica'}
-                            {currentView === 'Integrations' && 'Integraciones'}
+                            {vistaSegura === 'Dashboard' && 'Tablero Unificado de Tareas'}
+                            {vistaSegura === 'Admin' && 'Administración del Sistema'}
+                            {vistaSegura === 'Reports' && 'Reportes y Analítica'}
+                            {vistaSegura === 'Integrations' && 'Integraciones'}
                         </h2>
                         <p className="text-sm text-slate-500">
-                            {currentView === 'Dashboard' && (
+                            {vistaSegura === 'Dashboard' && (
                                 cargando
                                     ? 'Cargando solicitudes...'
                                     : `Gestiona tu portafolio TI. ${requests.length} solicitudes activas.`
                             )}
-                            {currentView === 'Admin' && 'Configurar catálogos y usuarios.'}
-                            {currentView === 'Reports' && 'Visualizar carga de trabajo y rendimiento.'}
+                            {vistaSegura === 'Admin' && 'Configurar catálogos y usuarios.'}
+                            {vistaSegura === 'Reports' && 'Visualizar carga de trabajo y rendimiento.'}
                         </p>
                     </div>
 
@@ -174,9 +245,17 @@ export default function App() {
                     <div className="flex items-center gap-3">
                         <div className="text-right">
                             <p className="text-sm font-medium text-slate-700">
-                                {user.user_metadata?.nombre_completo ?? user.email}
+                                {perfil?.nombre_completo ?? user.user_metadata?.nombre_completo ?? user.email}
                             </p>
-                            <p className="text-xs text-slate-400">{user.email}</p>
+                            <div className="flex items-center justify-end gap-2 mt-0.5">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${esAdministrador
+                                    ? 'bg-blue-100 text-blue-700'
+                                    : 'bg-slate-100 text-slate-600'
+                                    }`}>
+                                    {perfil?.rol ?? 'Colaborador'}
+                                </span>
+                                <p className="text-xs text-slate-400">{user.email}</p>
+                            </div>
                         </div>
                         <button
                             onClick={cerrarSesion}
@@ -197,7 +276,7 @@ export default function App() {
                     </div>
                 ) : (
                     <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-4">
-                        {currentView === 'Dashboard' && (
+                        {vistaSegura === 'Dashboard' && (
                             <Dashboard
                                 requests={requests}
                                 domains={domains}
@@ -205,20 +284,27 @@ export default function App() {
                                 onNewRequest={handleOpenNewRequest}
                                 onImportTickets={handleImportTickets}
                                 onStatusChange={handleRequestStatusChange}
+                                catalogos={catalogos}
                             />
                         )}
-                        {currentView === 'Admin' && (
+                        {vistaSegura === 'Admin' && esAdministrador && (
                             <AdminPanel
                                 domains={domains}
                                 users={[]}
                                 onUpdateDomain={handleUpdateDomain}
                                 onAddDomain={handleAddDomain}
+                                catalogos={catalogos}
+                                onAddCatalogo={(tipo: CatalogType, valor: string) => crearCatalogo(tipo, valor)}
+                                onUpdateCatalogo={actualizarCatalogo}
+                                onDeleteCatalogo={eliminarCatalogo}
+                                getModo={getModo}
+                                setModo={setModo}
                             />
                         )}
-                        {currentView === 'Reports' && (
+                        {vistaSegura === 'Reports' && (
                             <Reports requests={requests} />
                         )}
-                        {currentView === 'Integrations' && (
+                        {vistaSegura === 'Integrations' && (
                             <Integrations />
                         )}
                     </div>
@@ -231,6 +317,9 @@ export default function App() {
                 request={editingRequest}
                 onSave={handleSaveRequest}
                 domains={domains}
+                catalogos={catalogos}
+                historialFechas={historialFechas}
+                getModo={getModo}
             />
         </div>
     );

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ITRequest, DashboardView, FilterState, RequestType, Priority, Status, CatalogItem } from '../../types';
+import { ITRequest, DashboardView, FilterState, RequestType, Priority, Status, CatalogItem, CatalogoItem } from '../../types';
 import { KanbanBoard } from './KanbanBoard';
 import { RequestTable } from './RequestTable';
 import { LayoutGrid, List, Search, Filter, Plus, DownloadCloud } from 'lucide-react';
@@ -11,9 +11,10 @@ interface DashboardProps {
     onNewRequest: () => void;
     onImportTickets: () => void;
     onStatusChange: (requestId: string, newStatus: Status) => void;
+    catalogos: CatalogoItem[];
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onImportTickets, onStatusChange }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onImportTickets, onStatusChange, catalogos }) => {
     const [viewMode, setViewMode] = useState<DashboardView>('Kanban');
     const [filters, setFilters] = useState<FilterState>({
         domain: [],
@@ -167,9 +168,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         requests={filteredRequests}
                         onEdit={onEditRequest}
                         onStatusChange={onStatusChange}
+                        catalogosPrioridad={catalogos.filter(c => c.tipo === 'prioridad_negocio')}
                     />
                 ) : (
-                    <RequestTable requests={filteredRequests} onEdit={onEditRequest} />
+                    <RequestTable
+                        requests={filteredRequests}
+                        onEdit={onEditRequest}
+                        catalogosPrioridad={catalogos.filter(c => c.tipo === 'prioridad_negocio')}
+                    />
                 )}
             </div>
         </div>

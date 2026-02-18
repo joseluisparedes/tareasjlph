@@ -21,11 +21,26 @@ export enum Status {
     Closed = 'Cerrado'
 }
 
+export type UserRole = 'Administrador' | 'Colaborador';
+
+export type CatalogType =
+    | 'tipo_requerimiento'
+    | 'prioridad_negocio'
+    | 'estado'
+    | 'usuario_solicitante'
+    | 'direccion_solicitante'
+    | 'asignado_a'
+    | 'brm'
+    | 'institucion'
+    | 'tipo_tarea'
+    | 'complejidad'
+    | 'dominios';
+
 export interface User {
     id: string;
     name: string;
     email: string;
-    role: 'Admin' | 'Editor' | 'Lector';
+    role: UserRole;
     avatarUrl?: string;
 }
 
@@ -42,12 +57,39 @@ export interface ITRequest {
     createdAt: string;
     dueDate?: string;
     externalId?: string;
+    // Nuevos campos
+    prioridadNegocio?: string;
+    fechaInicio?: string;
+    fechaFin?: string;
+    tareaSN?: string;
+    ticketRIT?: string;
+    // Nuevos campos del catálogo
+    direccionSolicitante?: string;
+    brm?: string;
+    institucion?: string;
+    tipoTarea?: string;
+    complejidad?: string;
 }
 
 export interface CatalogItem {
     id: string;
     name: string;
     isActive: boolean;
+}
+
+export interface CatalogoItem {
+    id: string;
+    tipo: CatalogType;
+    valor: string;
+    esta_activo: boolean;
+    orden: number;
+    color?: string | null;
+    abreviatura?: string | null;
+}
+
+export interface CatalogoConfig {
+    tipo: CatalogType;
+    modo_visualizacion: 'desplegable' | 'cuadros';
 }
 
 export type ViewMode = 'Dashboard' | 'Admin' | 'Reports' | 'Integrations';

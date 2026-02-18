@@ -1,11 +1,21 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { supabase } from '../lib/supabase/cliente';
 import type { User, Session } from '@supabase/supabase-js';
+import type { UserRole } from '../types';
+
+interface PerfilUsuario {
+    id: string;
+    nombre_completo: string;
+    correo_electronico: string;
+    rol: UserRole;
+}
 
 interface AuthContextType {
     user: User | null;
+    perfil: PerfilUsuario | null;
     session: Session | null;
     cargando: boolean;
+    esAdministrador: boolean;
     iniciarSesion: (correo: string, contrasena: string) => Promise<void>;
     registrarse: (correo: string, contrasena: string, nombreCompleto: string) => Promise<void>;
     cerrarSesion: () => Promise<void>;
@@ -14,24 +24,40 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const MASTER_ADMIN_EMAIL = 'jose241100@gmail.com';
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
+    const [perfil, setPerfil] = useState<PerfilUsuario | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const cargarPerfil = async (userId: string) => {
+        const { data } = await supabase
+            .from('usuarios')
+            .select('id, nombre_completo, correo_electronico, rol')
+            .eq('id', userId)
+            .single();
+        if (data) setPerfil(data as PerfilUsuario);
+    };
+
     useEffect(() => {
-        // Obtener sesión inicial
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setUser(session?.user ?? null);
+            if (session?.user) cargarPerfil(session.user.id);
             setCargando(false);
         });
 
-        // Escuchar cambios de autenticación
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
             setUser(session?.user ?? null);
+            if (session?.user) {
+                cargarPerfil(session.user.id);
+            } else {
+                setPerfil(null);
+            }
             setCargando(false);
         });
 
@@ -53,13 +79,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         if (error) throw new Error(traducirError(error.message));
 
-        // Crear perfil en tabla usuarios
+        // Crear perfil — el trigger de BD asignará el rol correcto automáticamente
         if (data.user) {
             await supabase.from('usuarios').insert({
                 id: data.user.id,
                 nombre_completo: nombreCompleto,
                 correo_electronico: correo,
-                rol: 'Editor',
+                // El trigger asigna 'Administrador' si es el master, 'Colaborador' para todos los demás
+                rol: correo === MASTER_ADMIN_EMAIL ? 'Administrador' : 'Colaborador',
             });
         }
     };
@@ -68,8 +95,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await supabase.auth.signOut();
     };
 
+    const esAdministrador = perfil?.rol === 'Administrador';
+
     return (
-        <AuthContext.Provider value={{ user, session, cargando, iniciarSesion, registrarse, cerrarSesion, error }}>
+        <AuthContext.Provider value={{ user, perfil, session, cargando, esAdministrador, iniciarSesion, registrarse, cerrarSesion, error }}>
             {children}
         </AuthContext.Provider>
     );
@@ -87,5 +116,6 @@ function traducirError(msg: string): string {
     if (msg.includes('User already registered')) return 'Este correo ya está registrado.';
     if (msg.includes('Password should be at least')) return 'La contraseña debe tener al menos 6 caracteres.';
     if (msg.includes('Unable to validate email')) return 'Correo electrónico inválido.';
+    if (msg.includes('rate limit')) return 'Demasiados intentos. Espera unos minutos e intenta de nuevo.';
     return msg;
 }

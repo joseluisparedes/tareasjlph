@@ -1,10 +1,10 @@
 import { ITRequest, Priority, RequestType, Status, User, CatalogItem } from '../types';
 
 export const MOCK_USERS: User[] = [
-    { id: 'u1', name: 'Alex Johnson', email: 'alex.j@brm.com', role: 'Admin', avatarUrl: 'https://picsum.photos/32/32?random=1' },
-    { id: 'u2', name: 'Maria Garcia', email: 'maria.g@brm.com', role: 'Editor', avatarUrl: 'https://picsum.photos/32/32?random=2' },
-    { id: 'u3', name: 'Steve Smith', email: 'steve.s@brm.com', role: 'Editor', avatarUrl: 'https://picsum.photos/32/32?random=3' },
-    { id: 'u4', name: 'Sarah Connor', email: 'sarah.c@business.com', role: 'Lector', avatarUrl: 'https://picsum.photos/32/32?random=4' },
+    { id: 'u1', name: 'Alex Johnson', email: 'alex.j@brm.com', role: 'Administrador', avatarUrl: 'https://picsum.photos/32/32?random=1' },
+    { id: 'u2', name: 'Maria Garcia', email: 'maria.g@brm.com', role: 'Colaborador', avatarUrl: 'https://picsum.photos/32/32?random=2' },
+    { id: 'u3', name: 'Steve Smith', email: 'steve.s@brm.com', role: 'Colaborador', avatarUrl: 'https://picsum.photos/32/32?random=3' },
+    { id: 'u4', name: 'Sarah Connor', email: 'sarah.c@business.com', role: 'Colaborador', avatarUrl: 'https://picsum.photos/32/32?random=4' },
 ];
 
 export const MOCK_DOMAINS: CatalogItem[] = [
