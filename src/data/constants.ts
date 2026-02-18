@@ -1,4 +1,4 @@
-import { ITRequest, Priority, RequestType, Status, User, CatalogItem } from './types';
+import { ITRequest, Priority, RequestType, Status, User, CatalogItem } from '../types';
 
 export const MOCK_USERS: User[] = [
     { id: 'u1', name: 'Alex Johnson', email: 'alex.j@brm.com', role: 'Admin', avatarUrl: 'https://picsum.photos/32/32?random=1' },
@@ -78,7 +78,7 @@ export const MOCK_REQUESTS: ITRequest[] = [
         assigneeId: 'u1',
         createdAt: '2025-02-13T11:00:00Z'
     },
-     {
+    {
         id: 'BRM-2025-0006',
         title: 'Problema Acceso VPN',
         description: 'Usuarios remotos reportan lentitud en conexión VPN.',

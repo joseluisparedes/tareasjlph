@@ -1,7 +1,7 @@
 import React from 'react';
-import { ITRequest, Priority } from '../types';
-import { MOCK_USERS } from '../constants';
+import { ITRequest, Priority } from '../../types';
 import { MoreHorizontal } from 'lucide-react';
+import { MOCK_USERS } from '../../data/constants';
 
 interface RequestTableProps {
     requests: ITRequest[];
@@ -45,8 +45,8 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit }) 
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
                         {requests.map((req) => {
-                             const assignee = MOCK_USERS.find(u => u.id === req.assigneeId);
-                             return (
+                            const assignee = MOCK_USERS.find(u => u.id === req.assigneeId);
+                            return (
                                 <tr key={req.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => onEdit(req)}>
                                     <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-mono text-gray-500 sm:pl-6">{req.id}</td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm font-medium text-gray-900">
@@ -65,7 +65,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit }) 
                                     </td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">{req.requester}</td>
                                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                                         {assignee ? (
+                                        {assignee ? (
                                             <div className="flex items-center gap-2">
                                                 <img src={assignee.avatarUrl} alt="" className="h-6 w-6 rounded-full" />
                                                 <span className="text-xs">{assignee.name.split(' ')[0]}</span>
@@ -80,7 +80,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit }) 
                                         </button>
                                     </td>
                                 </tr>
-                             );
+                            );
                         })}
                     </tbody>
                 </table>

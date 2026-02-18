@@ -1,5 +1,5 @@
 import React from 'react';
-import { ITRequest, Status, RequestType } from '../types';
+import { ITRequest, Priority, Status, RequestType } from '../../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Download } from 'lucide-react';
 
@@ -8,7 +8,6 @@ interface ReportsProps {
 }
 
 export const Reports: React.FC<ReportsProps> = ({ requests }) => {
-    // Prepare Data for Charts
     const statusData = Object.values(Status).map(status => ({
         name: status,
         value: requests.filter(r => r.status === status).length
@@ -34,7 +33,6 @@ export const Reports: React.FC<ReportsProps> = ({ requests }) => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Status Distribution */}
                 <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm h-[400px] flex flex-col">
                     <h3 className="text-lg font-semibold text-slate-700 mb-4">Distribución por Estado</h3>
                     <div className="flex-1 w-full min-h-0">
@@ -62,19 +60,15 @@ export const Reports: React.FC<ReportsProps> = ({ requests }) => {
                     </div>
                 </div>
 
-                {/* Type Distribution */}
                 <div className="bg-white p-6 rounded-lg border border-slate-200 shadow-sm h-[400px] flex flex-col">
                     <h3 className="text-lg font-semibold text-slate-700 mb-4">Volumen por Tipo de Solicitud</h3>
                     <div className="flex-1 w-full min-h-0">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                                data={typeData}
-                                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                            >
+                            <BarChart data={typeData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                                 <XAxis dataKey="name" axisLine={false} tickLine={false} />
                                 <YAxis axisLine={false} tickLine={false} />
-                                <Tooltip cursor={{fill: 'transparent'}} />
+                                <Tooltip cursor={{ fill: 'transparent' }} />
                                 <Bar dataKey="count" fill="#4f46e5" radius={[4, 4, 0, 0]} barSize={40} />
                             </BarChart>
                         </ResponsiveContainer>
@@ -82,7 +76,6 @@ export const Reports: React.FC<ReportsProps> = ({ requests }) => {
                 </div>
             </div>
 
-            {/* Mock KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
                     <div className="text-slate-500 text-xs font-medium uppercase">Total Solicitudes</div>

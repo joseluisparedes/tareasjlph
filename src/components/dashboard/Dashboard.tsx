@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { ITRequest, DashboardView, FilterState, RequestType, Priority, Status, CatalogItem } from '../types';
+import { ITRequest, DashboardView, FilterState, RequestType, Priority, Status, CatalogItem } from '../../types';
 import { KanbanBoard } from './KanbanBoard';
 import { RequestTable } from './RequestTable';
-import { LayoutGrid, List, Search, Filter, Plus, Calendar, DownloadCloud } from 'lucide-react';
+import { LayoutGrid, List, Search, Filter, Plus, DownloadCloud } from 'lucide-react';
 
 interface DashboardProps {
     requests: ITRequest[];
@@ -50,11 +50,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
             {/* Action Bar */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-2">
-                     <div className="relative">
+                    <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input 
-                            type="text" 
-                            placeholder="Buscar solicitudes..." 
+                        <input
+                            type="text"
+                            placeholder="Buscar solicitudes..."
                             className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none w-64 bg-white text-gray-900"
                             value={filters.search}
                             onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
@@ -62,14 +62,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     </div>
                     <div className="h-8 w-px bg-slate-200 mx-2"></div>
                     <div className="flex bg-slate-100 p-1 rounded-lg">
-                        <button 
+                        <button
                             onClick={() => setViewMode('Kanban')}
                             className={`p-1.5 rounded-md transition-all ${viewMode === 'Kanban' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
                             title="Vista Kanban"
                         >
                             <LayoutGrid size={18} />
                         </button>
-                        <button 
+                        <button
                             onClick={() => setViewMode('Table')}
                             className={`p-1.5 rounded-md transition-all ${viewMode === 'Table' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
                             title="Vista Tabla"
@@ -80,14 +80,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                 </div>
 
                 <div className="flex gap-2">
-                    <button 
+                    <button
                         onClick={onImportTickets}
                         className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
                     >
                         <DownloadCloud size={18} />
                         Importar Tickets
                     </button>
-                    <button 
+                    <button
                         onClick={onNewRequest}
                         className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
                     >
@@ -102,8 +102,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                 <span className="text-slate-500 flex items-center gap-1 font-medium mr-2">
                     <Filter size={16} /> Filtros:
                 </span>
-                
-                <select 
+
+                <select
                     className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                     onChange={(e) => e.target.value && handleFilterChange('domain', e.target.value)}
                     value=""
@@ -114,7 +114,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     ))}
                 </select>
 
-                <select 
+                <select
                     className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                     onChange={(e) => e.target.value && handleFilterChange('type', e.target.value)}
                     value=""
@@ -123,7 +123,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     {Object.values(RequestType).map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
 
-                <select 
+                <select
                     className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                     onChange={(e) => e.target.value && handleFilterChange('priority', e.target.value)}
                     value=""
@@ -131,16 +131,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     <option value="">Prioridad</option>
                     {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
-                
+
                 {/* Active Filters Display */}
                 <div className="flex flex-wrap gap-2 ml-auto">
                     {[...filters.domain, ...filters.type, ...filters.priority, ...filters.status].map((f, i) => (
                         <span key={i} className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs flex items-center gap-1 border border-blue-100">
                             {f}
-                            <button 
+                            <button
                                 onClick={() => {
-                                    if(Object.values(RequestType).includes(f as any)) handleFilterChange('type', f);
-                                    else if(Object.values(Priority).includes(f as any)) handleFilterChange('priority', f);
+                                    if (Object.values(RequestType).includes(f as any)) handleFilterChange('type', f);
+                                    else if (Object.values(Priority).includes(f as any)) handleFilterChange('priority', f);
                                     else handleFilterChange('domain', f);
                                 }}
                                 className="hover:bg-blue-200 rounded-full p-0.5"
@@ -150,12 +150,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         </span>
                     ))}
                     {(filters.domain.length || filters.type.length || filters.priority.length) ? (
-                         <button 
-                            onClick={() => setFilters({domain: [], type: [], priority: [], status: [], search: ''})}
+                        <button
+                            onClick={() => setFilters({ domain: [], type: [], priority: [], status: [], search: '' })}
                             className="text-slate-400 hover:text-red-500 text-xs underline"
-                         >
+                        >
                             Limpiar todo
-                         </button>
+                        </button>
                     ) : null}
                 </div>
             </div>
@@ -163,9 +163,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
             {/* Content Area */}
             <div className="flex-1 min-h-0 overflow-hidden">
                 {viewMode === 'Kanban' ? (
-                    <KanbanBoard 
-                        requests={filteredRequests} 
-                        onEdit={onEditRequest} 
+                    <KanbanBoard
+                        requests={filteredRequests}
+                        onEdit={onEditRequest}
                         onStatusChange={onStatusChange}
                     />
                 ) : (

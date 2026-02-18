@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { ITRequest, Status, Priority } from '../types';
-import { MOCK_USERS } from '../constants';
-import { Clock, User as UserIcon, AlertCircle } from 'lucide-react';
+import { ITRequest, Status, Priority } from '../../types';
+import { MOCK_USERS } from '../../data/constants';
+import { Calendar, User, AlertCircle, CheckCircle2, Clock, Code, TestTube } from 'lucide-react';
 
 interface KanbanBoardProps {
     requests: ITRequest[];
@@ -37,8 +37,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
     };
 
     const handleDragLeave = () => {
-        // Optional: logic if needed, but managing state on enter/drop is usually sufficient for simple highlight
-        // setDragOverColumn(null); 
+        // setDragOverColumn(null);
     };
 
     const handleDrop = (e: React.DragEvent, status: Status) => {
@@ -55,10 +54,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
             {columns.map((status) => {
                 const columnRequests = requests.filter(r => r.status === status);
                 const isDragOver = dragOverColumn === status;
-                
+
                 return (
-                    <div 
-                        key={status} 
+                    <div
+                        key={status}
                         className={`min-w-[300px] flex-1 flex flex-col rounded-xl border transition-colors duration-200
                             ${isDragOver ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-200' : 'bg-slate-100/50 border-slate-200'}
                         `}
@@ -78,13 +77,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
                                 {columnRequests.length}
                             </span>
                         </div>
-                        
-                        <div className="p-2 flex-1 overflow-y-auto space-y-2 max-h-[calc(100vh-220px)] scrollbar-hide">
+
+                        <div className="p-2 flex-1 overflow-y-auto space-y-2 max-h-[calc(100vh-220px)]">
                             {columnRequests.map((req) => {
                                 const assignee = MOCK_USERS.find(u => u.id === req.assigneeId);
-                                
+
                                 return (
-                                    <div 
+                                    <div
                                         key={req.id}
                                         onClick={() => onEdit(req)}
                                         draggable
@@ -97,11 +96,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
                                                 {req.priority}
                                             </span>
                                         </div>
-                                        
+
                                         <h4 className="text-sm font-semibold text-slate-800 mb-1 leading-snug group-hover:text-blue-600 select-none">
                                             {req.title}
                                         </h4>
-                                        
+
                                         <p className="text-xs text-slate-500 line-clamp-2 mb-3 select-none">
                                             {req.description}
                                         </p>

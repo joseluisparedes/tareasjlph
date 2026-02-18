@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CatalogItem, User } from '../types';
+import { CatalogItem, User } from '../../types';
 import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, Edit2, Save, X } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -74,7 +74,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ domains, users: initialU
                         <div>
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-semibold text-lg">Dominios de Negocio</h3>
-                                <button 
+                                <button
                                     onClick={() => setIsAddingDomain(true)}
                                     className="flex items-center gap-2 text-sm bg-slate-800 text-white px-3 py-2 rounded-md hover:bg-slate-700"
                                 >
@@ -84,8 +84,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ domains, users: initialU
 
                             {isAddingDomain && (
                                 <div className="mb-4 p-4 bg-slate-50 rounded-lg border border-slate-200 flex items-center gap-2">
-                                    <input 
-                                        type="text" 
+                                    <input
+                                        type="text"
                                         placeholder="Nombre del Nuevo Dominio"
                                         className="flex-1 border border-slate-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white text-gray-900"
                                         value={newDomainName}
@@ -100,17 +100,17 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ domains, users: initialU
                                     </button>
                                 </div>
                             )}
-                            
+
                             <div className="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden">
                                 {domains.map((domain) => (
                                     <div key={domain.id} className="flex items-center justify-between p-4 border-b border-slate-200 last:border-0 bg-white">
                                         <div className="flex items-center gap-3 flex-1">
                                             <div className={`w-2 h-2 rounded-full flex-shrink-0 ${domain.isActive ? 'bg-green-500' : 'bg-red-400'}`}></div>
-                                            
+
                                             {editingDomainId === domain.id ? (
                                                 <div className="flex items-center gap-2 flex-1 max-w-sm">
-                                                    <input 
-                                                        type="text" 
+                                                    <input
+                                                        type="text"
                                                         className="flex-1 border border-slate-300 rounded px-2 py-1 text-sm bg-white text-gray-900"
                                                         value={editName}
                                                         onChange={(e) => setEditName(e.target.value)}
@@ -128,7 +128,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ domains, users: initialU
                                                 </>
                                             )}
                                         </div>
-                                        <button 
+                                        <button
                                             onClick={() => handleToggleDomain(domain)}
                                             className={`text-xs px-3 py-1.5 rounded border transition-colors ${domain.isActive ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}
                                         >
@@ -146,45 +146,51 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ domains, users: initialU
 
                     {activeTab === 'users' && (
                         <div>
-                             <div className="flex justify-between items-center mb-4">
+                            <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-semibold text-lg">Miembros del Equipo</h3>
                                 <button className="flex items-center gap-2 text-sm bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700">
                                     <UserPlus size={16} /> Invitar Usuario
                                 </button>
                             </div>
-                            
-                            <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg overflow-hidden">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
-                                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {initialUsers.map((user) => (
-                                        <tr key={user.id}>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="flex items-center">
-                                                    <img className="h-8 w-8 rounded-full" src={user.avatarUrl} alt="" />
-                                                    <div className="ml-4">
-                                                        <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                                                        <div className="text-sm text-gray-500">{user.email}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                                                    {user.role}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <button className="text-indigo-600 hover:text-indigo-900">Editar</button>
-                                            </td>
+
+                            {initialUsers.length === 0 ? (
+                                <div className="text-center py-12 text-slate-400">
+                                    <p>No hay usuarios registrados aún.</p>
+                                    <p className="text-sm mt-1">Los usuarios aparecerán aquí cuando se registren.</p>
+                                </div>
+                            ) : (
+                                <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg overflow-hidden">
+                                    <thead className="bg-gray-50">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuario</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rol</th>
+                                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {initialUsers.map((user) => (
+                                            <tr key={user.id}>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <div className="flex items-center">
+                                                        <div className="ml-4">
+                                                            <div className="text-sm font-medium text-gray-900">{user.name}</div>
+                                                            <div className="text-sm text-gray-500">{user.email}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap">
+                                                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                                        {user.role}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                                    <button className="text-indigo-600 hover:text-indigo-900">Editar</button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
                         </div>
                     )}
                 </div>
