@@ -38,7 +38,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
                 </button>
             </div>
 
-            <nav className="flex-1 py-6 px-3 space-y-2">
+            <nav className="flex-1 py-6 px-3 space-y-2 overflow-y-auto">
                 {navItems.map((item) => (
                     <button
                         key={item.view}

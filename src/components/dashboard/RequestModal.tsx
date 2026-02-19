@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ITRequest, RequestType, Priority, Status, CatalogItem, CatalogoItem, CatalogType } from '../../types';
-import type { SolicitudFecha } from '../../lib/supabase/tipos-bd';
+import type { SolicitudFecha, SolicitudApunte } from '../../lib/supabase/tipos-bd';
+import { apuntesApi } from '../../lib/api/apuntes';
 import { X, Save, Calendar, Hash, FileText, History, User, Grid } from 'lucide-react';
 
 interface RequestModalProps {
@@ -42,10 +43,19 @@ export const RequestModal: React.FC<RequestModalProps> = ({
     const getM = (t: CatalogType) => getModo?.(t) ?? 'desplegable';
 
     const [formData, setFormData] = useState<Partial<ITRequest>>({});
+    const [apuntes, setApuntes] = useState<SolicitudApunte[]>([]);
+    const [nuevoApunte, setNuevoApunte] = useState('');
+    const [guardandoApunte, setGuardandoApunte] = useState(false);
+    const [editingApunteId, setEditingApunteId] = useState<string | null>(null);
+    const [editNota, setEditNota] = useState('');
 
     useEffect(() => {
         if (request) {
             setFormData({ ...request });
+            // Cargar apuntes
+            apuntesApi.obtenerPorSolicitud(request.id)
+                .then(setApuntes)
+                .catch(err => console.error("Error al cargar apuntes:", err));
         } else {
             setFormData({
                 title: '', description: '',
@@ -56,8 +66,54 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                 // Nuevos campos vacíos
                 direccionSolicitante: '', brm: '', institucion: '', tipoTarea: '', complejidad: ''
             });
+            setApuntes([]);
         }
     }, [request, isOpen]);
+
+    const handleGuardarApunte = async () => {
+        if (!nuevoApunte.trim() || !request?.id) return;
+        setGuardandoApunte(true);
+        try {
+            // TODO: Obtener usuario real si hay auth
+            const apunte = await apuntesApi.crear(request.id, nuevoApunte, 'Usuario Actual');
+            setApuntes(prev => [apunte, ...prev]);
+            setNuevoApunte('');
+        } catch (error) {
+            console.error("Error al guardar apunte:", error);
+            alert("No se pudo guardar el apunte.");
+        } finally {
+            setGuardandoApunte(false);
+        }
+    };
+
+    const handleEliminarApunte = async (id: string) => {
+        if (!window.confirm('¿Eliminar este apunte?')) return;
+        try {
+            await apuntesApi.eliminar(id);
+            setApuntes(prev => prev.filter(a => a.id !== id));
+        } catch (error) {
+            console.error("Error al eliminar apunte:", error);
+            alert("No se pudo eliminar el apunte.");
+        }
+    };
+
+    const handleIniciarEdicion = (apunte: SolicitudApunte) => {
+        setEditingApunteId(apunte.id);
+        setEditNota(apunte.nota);
+    };
+
+    const handleGuardarEdicion = async () => {
+        if (!editingApunteId || !editNota.trim()) return;
+        try {
+            const actualizado = await apuntesApi.actualizar(editingApunteId, editNota);
+            setApuntes(prev => prev.map(a => a.id === editingApunteId ? actualizado : a));
+            setEditingApunteId(null);
+            setEditNota('');
+        } catch (error) {
+            console.error("Error al actualizar apunte:", error);
+            alert("No se pudo actualizar el apunte.");
+        }
+    };
 
     if (!isOpen) return null;
 
@@ -98,26 +154,115 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                     <form onSubmit={handleSubmit}>
                         <div className="px-6 py-5 space-y-6 max-h-[75vh] overflow-y-auto">
 
-                            {/* 1. Información Principal */}
-                            <div>
-                                <h4 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                    <FileText size={14} /> Información General
-                                </h4>
-                                <div className="grid grid-cols-6 gap-4">
-                                    <div className="col-span-6">
-                                        <label className={labelClass}>Título <span className="text-red-500 normal-case">*</span></label>
-                                        <input type="text" required className={inputClass}
-                                            value={formData.title || ''}
-                                            onChange={e => set('title', e.target.value)}
-                                            placeholder="Ej: Migración de Servidor..." />
+                            {/* 1. Información Principal y Apuntes */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Columna Izquierda: Información General */}
+                                <div>
+                                    <h4 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        <FileText size={14} /> Información General
+                                    </h4>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className={labelClass}>Título <span className="text-red-500 normal-case">*</span></label>
+                                            <input type="text" required className={inputClass}
+                                                value={formData.title || ''}
+                                                onChange={e => set('title', e.target.value)}
+                                                placeholder="Ej: Migración de Servidor..." />
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Descripción</label>
+                                            <textarea rows={4} className={inputClass}
+                                                value={formData.description || ''}
+                                                onChange={e => set('description', e.target.value)}
+                                                placeholder="Detalle..." />
+                                        </div>
                                     </div>
-                                    <div className="col-span-6">
-                                        <label className={labelClass}>Descripción</label>
-                                        <textarea rows={2} className={inputClass}
-                                            value={formData.description || ''}
-                                            onChange={e => set('description', e.target.value)}
-                                            placeholder="Detalle..." />
+                                </div>
+
+                                {/* Columna Derecha: Apuntes y Actualizaciones */}
+                                <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 flex flex-col h-full max-h-[300px]">
+                                    <h4 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                        <History size={14} /> Apuntes y Actualizaciones
+                                    </h4>
+
+                                    {/* Lista de Apuntes */}
+                                    <div className="flex-1 overflow-y-auto space-y-3 mb-3 pr-2 scrollbar-thin">
+                                        {apuntes.length === 0 ? (
+                                            <p className="text-xs text-slate-400 italic text-center py-4">No hay apuntes registrados.</p>
+                                        ) : (
+                                            apuntes.map(apunte => (
+                                                <div key={apunte.id} className="bg-white p-2.5 rounded border border-slate-200 shadow-sm text-xs group">
+                                                    <div className="flex justify-between items-start mb-1">
+                                                        <span className="font-bold text-slate-700">
+                                                            {new Date(apunte.fecha_creacion).toLocaleString()}
+                                                        </span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] text-slate-400">
+                                                                {apunte.creado_por || 'Sistema'}
+                                                            </span>
+                                                            {editingApunteId !== apunte.id && (
+                                                                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                                                    <button type="button" onClick={() => handleIniciarEdicion(apunte)} className="text-blue-400 hover:text-blue-600 p-0.5">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+                                                                    </button>
+                                                                    <button type="button" onClick={() => handleEliminarApunte(apunte.id)} className="text-red-400 hover:text-red-600 p-0.5">
+                                                                        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {editingApunteId === apunte.id ? (
+                                                        <div className="space-y-2">
+                                                            <textarea
+                                                                className="w-full text-xs rounded border-blue-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 p-1"
+                                                                rows={2}
+                                                                value={editNota}
+                                                                onChange={e => setEditNota(e.target.value)}
+                                                            />
+                                                            <div className="flex justify-end gap-2">
+                                                                <button type="button" onClick={() => setEditingApunteId(null)} className="text-[10px] text-slate-500 hover:text-slate-700">Cancelar</button>
+                                                                <button type="button" onClick={handleGuardarEdicion} className="text-[10px] bg-blue-600 text-white px-2 py-0.5 rounded hover:bg-blue-700">Guardar</button>
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-slate-600 whitespace-pre-wrap">{apunte.nota}</p>
+                                                    )}
+                                                </div>
+                                            ))
+                                        )}
                                     </div>
+
+                                    {/* Input Nuevo Apunte */}
+                                    <div className="flex gap-2 items-end">
+                                        <div className="flex-1">
+                                            <textarea
+                                                rows={2}
+                                                className="w-full text-xs rounded border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none p-2"
+                                                placeholder="Escribe una actualización..."
+                                                value={nuevoApunte}
+                                                onChange={e => setNuevoApunte(e.target.value)}
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                        e.preventDefault();
+                                                        handleGuardarApunte();
+                                                    }
+                                                }}
+                                            />
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleGuardarApunte}
+                                            disabled={!nuevoApunte.trim() || guardandoApunte || !request?.id}
+                                            className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                            title="Guardar Apunte"
+                                        >
+                                            <Save size={16} />
+                                        </button>
+                                    </div>
+                                    {!request?.id && (
+                                        <p className="text-[10px] text-orange-500 mt-1">Guarda la solicitud primero para agregar apuntes.</p>
+                                    )}
                                 </div>
                             </div>
 

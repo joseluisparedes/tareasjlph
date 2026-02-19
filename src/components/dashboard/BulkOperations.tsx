@@ -410,7 +410,7 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
     }
 
     return (
-        <div className="h-full flex flex-col items-center justify-center p-8">
+        <div className="h-full flex flex-col items-center justify-center p-8 overflow-y-auto">
             <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Panel de Importación */}
                 <div className="bg-white p-8 rounded-xl shadow-lg border border-slate-200 flex flex-col items-center text-center hover:shadow-xl transition-shadow group">

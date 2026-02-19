@@ -240,6 +240,43 @@ export default function App() {
         }
     };
 
+    const handleUpdateRequest = async (id: string, data: Partial<ITRequest>) => {
+        if (!user) return;
+        const currentReq = solicitudes.find(s => s.id === id);
+        if (!currentReq) return;
+
+        const updateData: any = {};
+
+        // Mapeo de campos
+        if (data.title !== undefined) updateData.titulo = data.title;
+        if (data.description !== undefined) updateData.descripcion = data.description;
+        if (data.type !== undefined) updateData.tipo_solicitud = data.type;
+        if (data.domain !== undefined) {
+            const domId = dominios.find(d => d.nombre === data.domain)?.id;
+            if (domId) updateData.dominio_id = domId;
+        }
+        if (data.requester !== undefined) updateData.solicitante = data.requester;
+        if (data.priority !== undefined) updateData.prioridad = data.priority;
+        if (data.status !== undefined) updateData.estado = data.status;
+        if (data.assigneeId !== undefined) updateData.asignado_a = data.assigneeId;
+        if (data.externalId !== undefined) updateData.id_externo = data.externalId;
+        if (data.prioridadNegocio !== undefined) updateData.prioridad_negocio = data.prioridadNegocio;
+        if (data.tareaSN !== undefined) updateData.tarea_sn = data.tareaSN;
+        if (data.ticketRIT !== undefined) updateData.ticket_rit = data.ticketRIT;
+        if (data.fechaInicio !== undefined) updateData.fecha_inicio = data.fechaInicio;
+        if (data.fechaFin !== undefined) updateData.fecha_fin = data.fechaFin;
+
+        // Historial de fechas
+        if (data.fechaInicio && data.fechaInicio !== currentReq.fecha_inicio) {
+            await fechasApi.registrar(id, 'inicio', data.fechaInicio, user.id);
+        }
+        if (data.fechaFin && data.fechaFin !== currentReq.fecha_fin) {
+            await fechasApi.registrar(id, 'fin', data.fechaFin, user.id);
+        }
+
+        await actualizarSolicitud(id, updateData);
+    };
+
     const handleImportTickets = () => {
         setCurrentView('Integrations');
     };
@@ -247,7 +284,7 @@ export default function App() {
     const cargando = cargandoSolicitudes || cargandoDominios;
 
     return (
-        <div className="flex h-screen bg-slate-50">
+        <div className="flex h-screen bg-slate-50 overflow-hidden">
             <Sidebar
                 currentView={vistaSegura}
                 onChangeView={setCurrentView}
@@ -257,7 +294,7 @@ export default function App() {
             />
 
             <main
-                className={`flex-1 p-6 h-screen overflow-hidden flex flex-col transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-20'}`}
+                className={`flex-1 p-6 h-full flex flex-col overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-20'}`}
             >
                 <header className="mb-4 flex-shrink-0 flex items-start justify-between">
                     <div>
@@ -313,7 +350,7 @@ export default function App() {
                         </div>
                     </div>
                 ) : (
-                    <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-4">
+                    <div className="flex-1 min-h-0 overflow-hidden pr-1 pb-4">
                         {vistaSegura === 'Dashboard' && (
                             <Dashboard
                                 requests={requests}
@@ -324,7 +361,6 @@ export default function App() {
                                 onStatusChange={handleRequestStatusChange}
                                 catalogos={catalogos}
                                 onUpdateCatalogoOrder={async (newOrder) => {
-                                    // Update order for each item
                                     const updates = newOrder.map((status, index) => {
                                         const item = catalogos.find(c => c.valor === status && c.tipo === 'estado');
                                         if (item) {
@@ -334,6 +370,13 @@ export default function App() {
                                     });
                                     await Promise.all(updates);
                                 }}
+                                onDelete={handleDeleteRequest}
+                                onDeleteBulk={async (ids) => {
+                                    for (const id of ids) {
+                                        await eliminarSolicitud(id);
+                                    }
+                                }}
+                                onUpdateRequest={handleUpdateRequest}
                             />
                         )}
                         {vistaSegura === 'Admin' && esAdministrador && (

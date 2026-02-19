@@ -210,18 +210,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     ];
 
     return (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 min-h-[600px]">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-full flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="border-b border-slate-200 px-6 py-5">
+            <div className="border-b border-slate-200 px-6 py-5 flex-shrink-0">
                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
                     <Shield className="text-blue-600" size={22} /> Panel de Administración
                 </h2>
                 <p className="text-slate-500 text-sm mt-1">Gestiona dominios, catálogos de valores y usuarios del sistema.</p>
             </div>
 
-            <div className="flex">
+            <div className="flex flex-1 min-h-0 overflow-hidden">
                 {/* Sidebar nav */}
-                <div className="w-56 border-r border-slate-200 p-4 space-y-1 flex-shrink-0">
+                <div className="w-56 border-r border-slate-200 p-4 space-y-1 flex-shrink-0 overflow-y-auto">
                     {tabs.map(tab => (
                         <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                             className={`w-full text-left px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === tab.id ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50'}`}>
@@ -231,7 +231,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 p-6">
+                <div className="flex-1 p-6 overflow-y-auto">
 
                     {/* ── TAB: Dominios TI ── */}
                     {activeTab === 'domains' && (

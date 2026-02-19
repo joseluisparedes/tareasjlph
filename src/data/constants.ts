@@ -27,7 +27,10 @@ export const MOCK_REQUESTS: ITRequest[] = [
         status: Status.Analysis,
         assigneeId: 'u1',
         createdAt: '2025-02-10T09:00:00Z',
-        externalId: 'INC-9921'
+        assigneeId: 'u1',
+        createdAt: '2025-02-10T09:00:00Z',
+        externalId: 'INC-9921',
+        direccionSolicitante: 'Contabilidad'
     },
     {
         id: 'BRM-2025-0002',
@@ -39,7 +42,9 @@ export const MOCK_REQUESTS: ITRequest[] = [
         priority: Priority.Medium,
         status: Status.Pending,
         assigneeId: null,
-        createdAt: '2025-02-11T14:30:00Z'
+        assigneeId: null,
+        createdAt: '2025-02-11T14:30:00Z',
+        direccionSolicitante: 'Reclutamiento'
     },
     {
         id: 'BRM-2025-0003',
@@ -52,7 +57,9 @@ export const MOCK_REQUESTS: ITRequest[] = [
         status: Status.Development,
         assigneeId: 'u2',
         createdAt: '2025-02-12T10:15:00Z',
-        externalId: 'JIRA-4421'
+        createdAt: '2025-02-12T10:15:00Z',
+        externalId: 'JIRA-4421',
+        direccionSolicitante: 'TI Infraestructura'
     },
     {
         id: 'BRM-2025-0004',
@@ -64,7 +71,8 @@ export const MOCK_REQUESTS: ITRequest[] = [
         priority: Priority.Low,
         status: Status.Closed,
         assigneeId: 'u3',
-        createdAt: '2025-02-05T08:00:00Z'
+        createdAt: '2025-02-05T08:00:00Z',
+        direccionSolicitante: 'Ventas Regional'
     },
     {
         id: 'BRM-2025-0005',
@@ -76,7 +84,8 @@ export const MOCK_REQUESTS: ITRequest[] = [
         priority: Priority.Critical,
         status: Status.Testing,
         assigneeId: 'u1',
-        createdAt: '2025-02-13T11:00:00Z'
+        createdAt: '2025-02-13T11:00:00Z',
+        direccionSolicitante: 'Nómina'
     },
     {
         id: 'BRM-2025-0006',
@@ -88,6 +97,7 @@ export const MOCK_REQUESTS: ITRequest[] = [
         priority: Priority.High,
         status: Status.Pending,
         assigneeId: null,
-        createdAt: '2025-02-14T09:00:00Z'
+        createdAt: '2025-02-14T09:00:00Z',
+        direccionSolicitante: 'Soporte Técnico'
     }
 ];

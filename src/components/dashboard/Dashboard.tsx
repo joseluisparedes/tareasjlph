@@ -11,11 +11,14 @@ interface DashboardProps {
     onNewRequest: () => void;
     onImportTickets: () => void;
     onStatusChange: (requestId: string, newStatus: Status) => void;
+    onDelete: (id: string) => void;
+    onDeleteBulk: (ids: string[]) => void;
     catalogos: CatalogoItem[];
     onUpdateCatalogoOrder?: (newOrder: string[]) => void;
+    onUpdateRequest: (id: string, data: Partial<ITRequest>) => Promise<void>;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onImportTickets, onStatusChange, catalogos, onUpdateCatalogoOrder }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onImportTickets, onStatusChange, onDelete, onDeleteBulk, catalogos, onUpdateCatalogoOrder, onUpdateRequest }) => {
     const [viewMode, setViewMode] = useState<DashboardView>('Kanban');
     const [filters, setFilters] = useState<FilterState>({
         domain: [],
@@ -177,7 +180,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     <RequestTable
                         requests={filteredRequests}
                         onEdit={onEditRequest}
+                        onDelete={onDelete}
+                        onDeleteBulk={onDeleteBulk}
                         catalogosPrioridad={catalogos.filter(c => c.tipo === 'prioridad_negocio')}
+                        onUpdateRequest={onUpdateRequest}
+                        domains={domains}
+                        catalogos={catalogos}
                     />
                 )}
             </div>

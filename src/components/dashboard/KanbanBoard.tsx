@@ -119,7 +119,9 @@ const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ re
                     {assignee ? (
                         <img src={assignee.avatarUrl} alt={assignee.name} className="w-5 h-5 rounded-full" title={assignee.name} />
                     ) : (
-                        <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[10px] text-slate-500">?</div>
+                        <span className="text-[10px] text-slate-500 font-medium px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200" title="Dirección Solicitante">
+                            {req.direccionSolicitante || '-'}
+                        </span>
                     )}
                 </div>
             </div>

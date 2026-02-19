@@ -55,6 +55,14 @@ export interface Catalogo {
     fecha_creacion: string;
 }
 
+export interface SolicitudApunte {
+    id: string;
+    solicitud_id: string;
+    nota: string;
+    creado_por: string | null; // ID del usuario o nombre
+    fecha_creacion: string;
+}
+
 export interface SolicitudFecha {
     id: string;
     solicitud_id: string;
@@ -71,6 +79,11 @@ export interface Database {
                 Row: Solicitud;
                 Insert: Omit<Solicitud, 'id' | 'fecha_creacion' | 'fecha_actualizacion'>;
                 Update: Partial<Omit<Solicitud, 'id' | 'fecha_creacion' | 'fecha_actualizacion'>>;
+            };
+            solicitud_apuntes: {
+                Row: SolicitudApunte;
+                Insert: Omit<SolicitudApunte, 'id' | 'fecha_creacion'>;
+                Update: Partial<Omit<SolicitudApunte, 'id' | 'fecha_creacion'>>;
             };
             dominios: {
                 Row: Dominio;
