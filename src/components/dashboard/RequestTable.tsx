@@ -183,6 +183,9 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         if (key === 'requester') {
             return catalogos?.filter(c => c.tipo === 'usuario_solicitante' && c.esta_activo).map(c => ({ value: c.valor, label: c.valor })) || [];
         }
+        if (key === 'direccionSolicitante') {
+            return catalogos?.filter(c => c.tipo === 'direccion_solicitante' && c.esta_activo).map(c => ({ value: c.valor, label: c.valor })) || [];
+        }
         return [];
     };
 
@@ -294,6 +297,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         { id: 'fechaInicio', key: 'fechaInicio' as keyof ITRequest, label: 'Fecha Inicio', sortable: true, editable: true, inputType: 'date' },
         { id: 'fechaFin', key: 'fechaFin' as keyof ITRequest, label: 'Fecha Fin', sortable: true, editable: true, inputType: 'date' },
         { id: 'requester', key: 'requester', label: 'Solicitante', sortable: true, editable: true, inputType: 'select' },
+        { id: 'direccionSolicitante', key: 'direccionSolicitante' as keyof ITRequest, label: 'Dirección Solicitante', sortable: true, editable: true, inputType: 'select' },
         {
             id: 'assigneeId', key: 'assigneeId', label: 'Asignado', sortable: true, editable: false, // Could be select if we had users list
             render: (req) => req.assigneeId ? <span className="text-xs text-slate-700">{req.assigneeId}</span> : <span className="text-gray-400 italic">Sin asignar</span>
@@ -317,7 +321,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         return new Set([
             'id', 'title', 'domain', 'type', 'status', 'priority', 'prioridadNegocio',
             'tareaSN', 'ticketRIT', 'fechaInicio', 'fechaFin',
-            'requester', 'assigneeId', 'actions'
+            'requester', 'direccionSolicitante', 'assigneeId', 'actions'
         ]);
     });
 
