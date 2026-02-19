@@ -297,7 +297,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         { id: 'fechaInicio', key: 'fechaInicio' as keyof ITRequest, label: 'Fecha Inicio', sortable: true, editable: true, inputType: 'date' },
         { id: 'fechaFin', key: 'fechaFin' as keyof ITRequest, label: 'Fecha Fin', sortable: true, editable: true, inputType: 'date' },
         { id: 'requester', key: 'requester', label: 'Solicitante', sortable: true, editable: true, inputType: 'select' },
-        { id: 'direccionSolicitante', key: 'direccionSolicitante' as keyof ITRequest, label: 'Dirección Solicitante', sortable: true, editable: true, inputType: 'select' },
+        { id: 'direccionSolicitante', key: 'direccionSolicitante', label: 'Dirección de Solicitante', sortable: true, editable: true, inputType: 'select' },
         {
             id: 'assigneeId', key: 'assigneeId', label: 'Asignado', sortable: true, editable: false, // Could be select if we had users list
             render: (req) => req.assigneeId ? <span className="text-xs text-slate-700">{req.assigneeId}</span> : <span className="text-gray-400 italic">Sin asignar</span>

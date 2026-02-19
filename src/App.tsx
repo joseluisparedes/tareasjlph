@@ -265,6 +265,7 @@ export default function App() {
         if (data.ticketRIT !== undefined) updateData.ticket_rit = data.ticketRIT;
         if (data.fechaInicio !== undefined) updateData.fecha_inicio = data.fechaInicio;
         if (data.fechaFin !== undefined) updateData.fecha_fin = data.fechaFin;
+        if (data.direccionSolicitante !== undefined) updateData.direccion_solicitante = data.direccionSolicitante;
 
         // Historial de fechas
         if (data.fechaInicio && data.fechaInicio !== currentReq.fecha_inicio) {
