@@ -52,7 +52,7 @@ export interface ITRequest {
     domain: string;
     requester: string;
     priority: Priority;
-    status: Status;
+    status: string;
     assigneeId: string | null;
     createdAt: string;
     dueDate?: string;
@@ -99,6 +99,6 @@ export interface FilterState {
     domain: string[];
     type: RequestType[];
     priority: Priority[];
-    status: Status[];
+    status: string[];
     search: string;
 }

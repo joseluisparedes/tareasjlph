@@ -32,7 +32,7 @@ export function useCatalogos() {
         return nuevo;
     };
 
-    const actualizarItem = async (id: string, cambios: Partial<Pick<CatalogoItem, 'valor' | 'esta_activo' | 'color' | 'abreviatura'>>) => {
+    const actualizarItem = async (id: string, cambios: Partial<Pick<CatalogoItem, 'valor' | 'esta_activo' | 'color' | 'abreviatura' | 'orden'>>) => {
         const actualizado = await catalogosApi.actualizar(id, cambios);
         setCatalogos(prev => prev.map(c => c.id === id ? actualizado : c));
         return actualizado;

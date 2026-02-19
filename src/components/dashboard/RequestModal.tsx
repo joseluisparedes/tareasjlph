@@ -8,92 +8,20 @@ interface RequestModalProps {
     onClose: () => void;
     request: ITRequest | null;
     onSave: (req: ITRequest) => void;
+    onDelete?: (id: string) => void;
     domains: CatalogItem[];
     catalogos: CatalogoItem[];
     historialFechas?: SolicitudFecha[];
     getModo?: (tipo: CatalogType) => 'desplegable' | 'cuadros';
 }
 
+import { SelectorCampo } from '../shared/SelectorCampo';
+
 const inputClass = "mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm border p-2 bg-white text-slate-900 placeholder-slate-400";
 const labelClass = "block text-xs font-semibold text-slate-600 uppercase tracking-wide";
 
-// ─── Componente Helper: Campo de Selección (Maneja Logica Cuadros vs Lista) ─
-const SelectorCampo: React.FC<{
-    label: string;
-    valor: string;
-    onChange: (v: string) => void;
-    opciones: CatalogoItem[];
-    modo: 'desplegable' | 'cuadros';
-    required?: boolean;
-    placeholder?: string;
-    fallbackOptions?: string[]; // Para enums básicos si el catálogo está vacío
-}> = ({ label, valor, onChange, opciones, modo, required, placeholder = "-- Selecciona --", fallbackOptions }) => {
-
-    // Si hay opciones en el catálogo, usarlas. Si no, usar fallback (ej. enums hardcodeados)
-    const tieneOpciones = opciones.length > 0;
-    const listaOpciones = tieneOpciones
-        ? opciones
-        : (fallbackOptions?.map(opt => ({ id: opt, valor: opt } as CatalogoItem)) || []);
-
-    return (
-        <div className="col-span-6 sm:col-span-3">
-            <label className={labelClass}>{label} {required && <span className="text-red-500 normal-case">*</span>}</label>
-
-            {modo === 'cuadros' && listaOpciones.length > 0 ? (
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                    {/* Opción vacía / Placeholder */}
-                    <button type="button"
-                        onClick={() => onChange('')}
-                        className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-all ${!valor
-                                ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
-                                : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400'
-                            }`}>
-                        {placeholder || '—'}
-                    </button>
-                    {listaOpciones.map(op => {
-                        // Manejo flexible: op puede ser CatalogoItem o un objeto improvisado del fallback
-                        const val = op.valor;
-                        const labelText = op.abreviatura || val;
-                        const selected = valor === val;
-                        return (
-                            <button
-                                key={op.id || val}
-                                type="button"
-                                title={val}
-                                onClick={() => onChange(val)}
-                                className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all ${selected
-                                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm scale-105'
-                                        : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600'
-                                    }`}
-                                style={selected && op.color ? { backgroundColor: op.color, borderColor: op.color } : undefined}
-                            >
-                                {labelText}
-                            </button>
-                        );
-                    })}
-                    {required && !valor && <input type="text" required readOnly value="" className="sr-only" aria-hidden />}
-                </div>
-            ) : (
-                <select
-                    required={required}
-                    className={inputClass}
-                    value={valor || ''}
-                    onChange={e => onChange(e.target.value)}
-                >
-                    <option value="">{placeholder}</option>
-                    {listaOpciones.map(op => (
-                        <option key={op.id || op.valor} value={op.valor}>
-                            {op.valor}
-                        </option>
-                    ))}
-                </select>
-            )}
-        </div>
-    );
-};
-
 export const RequestModal: React.FC<RequestModalProps> = ({
-    isOpen, onClose, request, onSave, domains, catalogos, historialFechas = [], getModo
+    isOpen, onClose, request, onSave, onDelete, domains, catalogos, historialFechas = [], getModo
 }) => {
     // Filtrar catálogos activos
     const getCats = (tipo: CatalogType) => catalogos.filter(c => c.tipo === tipo && c.esta_activo);
@@ -359,15 +287,31 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl flex justify-end gap-3">
-                            <button type="button" onClick={onClose}
-                                className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
-                                Cancelar
-                            </button>
-                            <button type="submit"
-                                className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
-                                <Save size={15} /> Guardar Solicitud
-                            </button>
+                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl flex justify-between gap-3">
+                            {request && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (window.confirm('¿Estás seguro de eliminar esta solicitud?')) {
+                                            onDelete?.(request.id);
+                                            onClose();
+                                        }
+                                    }}
+                                    className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                                >
+                                    Eliminar
+                                </button>
+                            )}
+                            <div className="flex gap-3 ml-auto">
+                                <button type="button" onClick={onClose}
+                                    className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
+                                    Cancelar
+                                </button>
+                                <button type="submit"
+                                    className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+                                    <Save size={15} /> Guardar Solicitud
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>

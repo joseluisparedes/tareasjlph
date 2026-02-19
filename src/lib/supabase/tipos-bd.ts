@@ -6,7 +6,7 @@ export interface Solicitud {
     dominio_id: string;
     solicitante: string;
     prioridad: 'Crítica' | 'Alta' | 'Media' | 'Baja';
-    estado: 'Pendiente' | 'Análisis' | 'Desarrollo' | 'Pruebas' | 'Cerrado';
+    estado: string;
     asignado_a: string | null; // texto libre (nombre del responsable)
     fecha_vencimiento: string | null;
     id_externo: string | null;

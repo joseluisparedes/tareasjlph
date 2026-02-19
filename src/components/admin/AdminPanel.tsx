@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CatalogItem, CatalogoItem, CatalogType, User } from '../../types';
+import { CatalogItem, CatalogoItem, CatalogType, User, ITRequest } from '../../types';
 import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, Edit2, Save, X, Plus, Tag, LayoutGrid, List } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -13,6 +13,7 @@ interface AdminPanelProps {
     onDeleteCatalogo: (id: string) => void;
     getModo: (tipo: CatalogType) => 'desplegable' | 'cuadros';
     setModo: (tipo: CatalogType, modo: 'desplegable' | 'cuadros') => void;
+    requests: ITRequest[];
 }
 
 type AdminTab = 'domains' | 'catalogs' | 'users';
@@ -40,7 +41,8 @@ const CatalogSection: React.FC<{
     onUpdate: (id: string, cambios: Partial<Pick<CatalogoItem, 'valor' | 'esta_activo' | 'color' | 'abreviatura'>>) => void;
     onDelete: (id: string) => void;
     onToggleModo: () => void;
-}> = ({ tipo, label, items, modo, onAdd, onUpdate, onDelete, onToggleModo }) => {
+    requests: ITRequest[];
+}> = ({ tipo, label, items, modo, onAdd, onUpdate, onDelete, onToggleModo, requests }) => {
     const [adding, setAdding] = useState(false);
     const [newVal, setNewVal] = useState('');
     const [newAbrev, setNewAbrev] = useState('');
@@ -60,6 +62,20 @@ const CatalogSection: React.FC<{
             onUpdate(id, { valor: editVal.trim(), abreviatura: editAbrev.trim() || null });
             setEditId(null);
         }
+    };
+
+    const handleDeleteClick = (item: CatalogoItem) => {
+        if (tipo === 'estado') {
+            const count = requests.filter(r => r.status === item.valor).length;
+            if (count > 0) {
+                if (confirm(`ADVERTENCIA CRÍTICA:\n\nEl estado "${item.valor}" contiene ${count} solicitudes.\nSi lo eliminas, SE ELIMINARÁN TODAS ESTAS SOLICITUDES permanentemente.\n\n¿Estás realmente seguro de continuar?`)) {
+                    onDelete(item.id);
+                }
+                return;
+            }
+        }
+
+        if (confirm(`¿Eliminar "${item.valor}"?`)) onDelete(item.id);
     };
 
     return (
@@ -152,7 +168,7 @@ const CatalogSection: React.FC<{
                                             className={`text-xs px-2 py-0.5 rounded border transition-colors ${item.esta_activo ? 'border-red-200 text-red-500 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
                                             {item.esta_activo ? 'Desact.' : 'Activar'}
                                         </button>
-                                        <button onClick={() => { if (confirm(`¿Eliminar "${item.valor}"?`)) onDelete(item.id); }}
+                                        <button onClick={() => handleDeleteClick(item)}
                                             className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={12} /></button>
                                     </div>
                                 </>
@@ -169,7 +185,7 @@ const CatalogSection: React.FC<{
 export const AdminPanel: React.FC<AdminPanelProps> = ({
     domains, users: initialUsers, onUpdateDomain, onAddDomain,
     catalogos, onAddCatalogo, onUpdateCatalogo, onDeleteCatalogo,
-    getModo, setModo,
+    getModo, setModo, requests
 }) => {
     const [activeTab, setActiveTab] = useState<AdminTab>('domains');
     const [isAddingDomain, setIsAddingDomain] = useState(false);
@@ -227,8 +243,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                         onClick={() => setModo('dominios', getModo('dominios') === 'desplegable' ? 'cuadros' : 'desplegable')}
                                         title={getModo('dominios') === 'desplegable' ? 'Cambiar a cuadros de selección rápida' : 'Cambiar a lista desplegable'}
                                         className={`flex items-center gap-1.5 text-xs px-2.5 py-2 rounded-lg border font-medium transition-colors ${getModo('dominios') === 'cuadros'
-                                                ? 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'
-                                                : 'bg-slate-100 border-slate-300 text-slate-500 hover:bg-slate-200'
+                                            ? 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'
+                                            : 'bg-slate-100 border-slate-300 text-slate-500 hover:bg-slate-200'
                                             }`}
                                     >
                                         {getModo('dominios') === 'cuadros' ? <LayoutGrid size={14} /> : <List size={14} />}
@@ -308,6 +324,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                         onUpdate={onUpdateCatalogo}
                                         onDelete={onDeleteCatalogo}
                                         onToggleModo={() => setModo(tipo, getModo(tipo) === 'desplegable' ? 'cuadros' : 'desplegable')}
+                                        requests={requests}
                                     />
                                 ))}
                             </div>

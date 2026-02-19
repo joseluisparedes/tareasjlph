@@ -4,7 +4,7 @@ import { Dashboard } from './components/dashboard/Dashboard';
 import { RequestModal } from './components/dashboard/RequestModal';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { Reports } from './components/dashboard/Reports';
-import { Integrations } from './components/dashboard/Integrations';
+import { BulkOperations } from './components/dashboard/BulkOperations';
 import { AuthPage } from './components/auth/AuthPage';
 import { ITRequest, ViewMode, CatalogItem, RequestType, Priority, Status } from './types';
 import { useSolicitudes } from './hooks/useSolicitudes';
@@ -72,6 +72,7 @@ export default function App() {
         cambiarEstado,
         crearSolicitud,
         actualizarSolicitud,
+        eliminarSolicitud,
     } = useSolicitudes();
 
     const {
@@ -89,6 +90,11 @@ export default function App() {
     } = useCatalogos();
 
     const { getModo, setModo } = useCatalogoConfig();
+
+    const handleDeleteRequest = async (id: string) => {
+        await eliminarSolicitud(id);
+        setIsModalOpen(false);
+    };
 
     // Pantalla de carga inicial
     if (cargandoAuth) {
@@ -203,8 +209,39 @@ export default function App() {
         await cambiarEstado(requestId, newStatus as Solicitud['estado']);
     };
 
+    const handleImportRequests = async (newRequests: Partial<ITRequest>[]) => {
+        if (!user) return;
+
+        for (const req of newRequests) {
+            await crearSolicitud({
+                titulo: req.title || 'Sin Título',
+                descripcion: req.description || '',
+                tipo_solicitud: (Object.values(RequestType).includes(req.type as RequestType) ? req.type : RequestType.NewOrder) as Solicitud['tipo_solicitud'],
+                dominio_id: dominios.find(d => d.nombre === req.domain)?.id || dominios[0]?.id,
+                solicitante: user.email || 'Importado',
+                prioridad: (Object.values(Priority).includes(req.priority as Priority) ? req.priority : Priority.Medium) as Solicitud['prioridad'],
+                estado: Status.Pending as Solicitud['estado'],
+                creado_por: user.id,
+                tarea_sn: req.tareaSN || null,
+                ticket_rit: req.ticketRIT || null,
+                // Campos obligatorios adicionales (según tipo Solicitud)
+                asignado_a: null,
+                id_externo: null,
+                fecha_vencimiento: null,
+                prioridad_negocio: null,
+                fecha_inicio: null,
+                fecha_fin: null,
+                direccion_solicitante: null,
+                brm: null,
+                institucion: null,
+                tipo_tarea: null,
+                complejidad: null
+            });
+        }
+    };
+
     const handleImportTickets = () => {
-        alert('Función de importación disponible próximamente con integración Jira/ServiceNow.');
+        setCurrentView('Integrations');
     };
 
     const cargando = cargandoSolicitudes || cargandoDominios;
@@ -228,7 +265,7 @@ export default function App() {
                             {vistaSegura === 'Dashboard' && 'Tablero Unificado de Tareas'}
                             {vistaSegura === 'Admin' && 'Administración del Sistema'}
                             {vistaSegura === 'Reports' && 'Reportes y Analítica'}
-                            {vistaSegura === 'Integrations' && 'Integraciones'}
+                            {vistaSegura === 'Integrations' && 'Importación y Exportación'}
                         </h2>
                         <p className="text-sm text-slate-500">
                             {vistaSegura === 'Dashboard' && (
@@ -238,6 +275,7 @@ export default function App() {
                             )}
                             {vistaSegura === 'Admin' && 'Configurar catálogos y usuarios.'}
                             {vistaSegura === 'Reports' && 'Visualizar carga de trabajo y rendimiento.'}
+                            {vistaSegura === 'Integrations' && 'Carga masiva y descarga de reportes.'}
                         </p>
                     </div>
 
@@ -285,6 +323,17 @@ export default function App() {
                                 onImportTickets={handleImportTickets}
                                 onStatusChange={handleRequestStatusChange}
                                 catalogos={catalogos}
+                                onUpdateCatalogoOrder={async (newOrder) => {
+                                    // Update order for each item
+                                    const updates = newOrder.map((status, index) => {
+                                        const item = catalogos.find(c => c.valor === status && c.tipo === 'estado');
+                                        if (item) {
+                                            return actualizarCatalogo(item.id, { orden: index });
+                                        }
+                                        return Promise.resolve();
+                                    });
+                                    await Promise.all(updates);
+                                }}
                             />
                         )}
                         {vistaSegura === 'Admin' && esAdministrador && (
@@ -299,13 +348,20 @@ export default function App() {
                                 onDeleteCatalogo={eliminarCatalogo}
                                 getModo={getModo}
                                 setModo={setModo}
+                                requests={requests}
                             />
                         )}
                         {vistaSegura === 'Reports' && (
                             <Reports requests={requests} />
                         )}
                         {vistaSegura === 'Integrations' && (
-                            <Integrations />
+                            <BulkOperations
+                                requests={requests}
+                                onImport={handleImportRequests}
+                                domains={domains}
+                                catalogos={catalogos}
+                                getModo={getModo}
+                            />
                         )}
                     </div>
                 )}
@@ -316,6 +372,7 @@ export default function App() {
                 onClose={() => setIsModalOpen(false)}
                 request={editingRequest}
                 onSave={handleSaveRequest}
+                onDelete={handleDeleteRequest}
                 domains={domains}
                 catalogos={catalogos}
                 historialFechas={historialFechas}
