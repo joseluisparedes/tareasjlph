@@ -33,7 +33,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
 
     const filteredRequests = useMemo(() => {
         return requests.filter(req => {
-            if (filters.search && !req.title.toLowerCase().includes(filters.search.toLowerCase()) && !req.id.toLowerCase().includes(filters.search.toLowerCase())) return false;
+            if (filters.search) {
+                const term = filters.search.toLowerCase();
+                // Búsqueda global (en todas las columnas) re-ubicada aquí
+                const matches = Object.values(req).some(val => {
+                    if (val === null || val === undefined) return false;
+                    return String(val).toLowerCase().includes(term);
+                });
+                if (!matches) return false;
+            }
+
             if (filters.domain.length > 0 && !filters.domain.includes(req.domain)) return false;
             if (filters.type.length > 0 && !filters.type.includes(req.type)) return false;
             if (filters.urgency.length > 0 && !filters.urgency.includes(req.urgency)) return false;
@@ -299,6 +308,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     <option value="">Solicitante</option>
                     {uniqueRequesters.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
+
+
 
                 {/* Active Filters Display */}
                 <div className="flex flex-wrap gap-2 ml-auto">
