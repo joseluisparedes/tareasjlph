@@ -6,7 +6,7 @@ export enum RequestType {
     AdHoc = 'Ad Hoc'
 }
 
-export enum Priority {
+export enum Urgency {
     Critical = 'Crítica',
     High = 'Alta',
     Medium = 'Media',
@@ -25,7 +25,8 @@ export type UserRole = 'Administrador' | 'Colaborador';
 
 export type CatalogType =
     | 'tipo_requerimiento'
-    | 'prioridad_negocio'
+    | 'prioridad'
+    | 'urgencia'
     | 'estado'
     | 'usuario_solicitante'
     | 'direccion_solicitante'
@@ -51,14 +52,14 @@ export interface ITRequest {
     type: RequestType;
     domain: string;
     requester: string;
-    priority: Priority;
+    urgency: Urgency;
     status: string;
     assigneeId: string | null;
     createdAt: string;
     dueDate?: string;
     externalId?: string;
     // Nuevos campos
-    prioridadNegocio?: string;
+    priority?: string;
     fechaInicio?: string;
     fechaFin?: string;
     tareaSN?: string;
@@ -98,7 +99,15 @@ export type DashboardView = 'Kanban' | 'Table';
 export interface FilterState {
     domain: string[];
     type: RequestType[];
-    priority: Priority[];
+    urgency: Urgency[];
     status: string[];
+    direction: string[]; // Nueva propiedad
+    requester: string[]; // Nueva propiedad
     search: string;
+}
+
+export interface SavedFilter {
+    id: string;
+    name: string;
+    config: FilterState;
 }

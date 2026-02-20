@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { ITRequest, Status, RequestType, Priority, CatalogItem, CatalogoItem, CatalogType } from '../../types';
+import { ITRequest, Status, RequestType, Urgency, CatalogItem, CatalogoItem, CatalogType } from '../../types';
 import { Download, Upload, FileSpreadsheet, AlertCircle, CheckCircle, Save, Trash2, X } from 'lucide-react';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
@@ -12,7 +12,7 @@ interface ImportRow {
     descripcion: string;
     tarea_sn?: string;
     ticket_rit?: string;
-    prioridad?: string; // Priority enum or string
+    urgency?: string; // Urgency enum or string
     tipo?: string; // RequestType enum or string
     dominio?: string;
     estado?: string; // Status enum or string
@@ -20,7 +20,7 @@ interface ImportRow {
     // Nuevos campos
     solicitante?: string; // email or name
     asignado_a?: string; // id or name
-    prioridad_negocio?: string;
+    priority?: string;
     fecha_inicio?: string;
     fecha_fin?: string;
     direccion_solicitante?: string;
@@ -33,6 +33,7 @@ interface ImportRow {
 interface ValidatedRow extends ImportRow {
     isValid: boolean;
     errors: string[];
+    fieldErrors: Record<string, boolean>; // Para resaltar celdas
     id: string; // ID temporal para la tabla
 }
 
@@ -54,6 +55,15 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
     const getCats = (tipo: CatalogType) => catalogos.filter(c => c.tipo === tipo && c.esta_activo);
     const getM = (t: CatalogType) => getModo?.(t) ?? 'desplegable';
 
+    // Helper para incluir valor actual si no existe (para visualización)
+    const getOptionsWithCurrent = (tipo: CatalogType, currentValue: string | undefined): CatalogoItem[] => {
+        const options = getCats(tipo);
+        if (currentValue && !options.some(o => o.valor === currentValue)) {
+            return [...options, { id: 'temp-new', tipo, valor: currentValue, esta_activo: true, orden: 999 }];
+        }
+        return options;
+    };
+
     // --- Lógica de Exportación ---
     const handleExportCSV = () => {
         const data = requests.map(req => ({
@@ -61,13 +71,13 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
             Titulo: req.title,
             Descripcion: req.description,
             Estado: req.status,
-            Prioridad: req.priority,
+            Urgencia: req.urgency,
             Tipo: req.type,
             Dominio: req.domain,
             Solicitante: req.requester,
             Asignado: req.assigneeId || '',
             Fecha_Creacion: new Date(req.createdAt).toLocaleDateString(),
-            Prioridad_Negocio: req.prioridadNegocio || '',
+            Prioridad: req.priority || '',
             Tarea_SN: req.tareaSN || '',
             Ticket_RIT: req.ticketRIT || '',
             Fecha_Inicio: req.fechaInicio || '',
@@ -90,13 +100,13 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
             Titulo: req.title,
             Descripcion: req.description,
             Estado: req.status,
-            Prioridad: req.priority,
+            Urgencia: req.urgency,
             Tipo: req.type,
             Dominio: req.domain,
             Solicitante: req.requester,
             Asignado: req.assigneeId || '',
             Fecha_Creacion: new Date(req.createdAt).toLocaleDateString(),
-            Prioridad_Negocio: req.prioridadNegocio || '',
+            Prioridad: req.priority || '',
             Tarea_SN: req.tareaSN || '',
             Ticket_RIT: req.ticketRIT || '',
             Fecha_Inicio: req.fechaInicio || '',
@@ -117,6 +127,85 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
     };
 
     // --- Lógica de Importación ---
+    // --- Lógica de Importación ---
+    const parseDate = (dateStr: string | number | undefined): string => {
+        if (!dateStr) return '';
+        if (typeof dateStr === 'number') {
+            // Excel serial date
+            const date = XLSX.SSF.parse_date_code(dateStr);
+            return `${date.y}-${String(date.m).padStart(2, '0')}-${String(date.d).padStart(2, '0')}`;
+        }
+        if (typeof dateStr === 'string') {
+            // Check for DD/MM/YYYY
+            if (dateStr.includes('/')) {
+                const parts = dateStr.split('/');
+                if (parts.length === 3) {
+                    // Assume DD/MM/YYYY if distinct, or safe guess
+                    const [day, month, year] = parts.map(Number);
+                    if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    }
+                }
+            }
+            // Si ya es YYYY-MM-DD, retornarlo
+            if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+                return dateStr;
+            }
+            // Si no se pudo parsear, retornar vacío (para que sea opcional y no marque error)
+            return '';
+        }
+        return '';
+    };
+
+    const validateRow = (row: ImportRow): { isValid: boolean, errors: string[], fieldErrors: Record<string, boolean> } => {
+        const errors: string[] = [];
+        const fieldErrors: Record<string, boolean> = {};
+
+        const checkRequired = (field: keyof ImportRow, label: string) => {
+            if (!row[field] || row[field]?.toString().trim() === '') {
+                errors.push(`${label} está vacío`);
+                fieldErrors[field] = true;
+            }
+        };
+
+        // Validaciones obligatorias
+        checkRequired('titulo', 'Título');
+        // checkRequired('descripcion', 'Descripción'); // Opcional
+        checkRequired('dominio', 'Dominio');
+        checkRequired('estado', 'Estado');
+        checkRequired('tipo', 'Tipo');
+        checkRequired('urgency', 'Urgencia');
+        checkRequired('solicitante', 'Solicitante');
+
+        // Nuevas validaciones solicitadas
+        checkRequired('complejidad', 'Complejidad');
+        checkRequired('tipo_tarea', 'Tipo de Tarea');
+
+        // Validaciones condicionales o advertencias (si se requieren como obligatorias, descomentar)
+        // checkRequired('asignado_a', 'Asignado A');
+        // checkRequired('brm', 'BRM');
+        // checkRequired('institucion', 'Institución');
+        // checkRequired('direccion_solicitante', 'Dirección');
+
+        // Validación de fechas
+        if (row.fecha_inicio && row.fecha_inicio.trim() !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(row.fecha_inicio)) {
+            errors.push('Fecha Inicio inválida');
+            fieldErrors['fecha_inicio'] = true;
+        }
+        if (row.fecha_fin && row.fecha_fin.trim() !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(row.fecha_fin)) {
+            errors.push('Fecha Fin inválida');
+            fieldErrors['fecha_fin'] = true;
+        }
+
+        return {
+            isValid: errors.length === 0,
+            errors,
+            fieldErrors
+        };
+    };
+
+    const [normalizationCount, setNormalizationCount] = useState(0);
+
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
@@ -136,6 +225,25 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
                     .trim();
             };
 
+            // Función para normalizar valores de catálogo
+            const normalizeStr = (str: string) => str ? str.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : "";
+
+            let normCounter = 0;
+
+            const getNormalizedValue = (tipo: CatalogType, valor: string): string => {
+                if (!valor) return '';
+                const normalizedInput = normalizeStr(valor);
+                const match = catalogos.find(c => c.tipo === tipo && normalizeStr(c.valor) === normalizedInput);
+
+                if (match) {
+                    if (match.valor !== valor) {
+                        normCounter++; // Contar corrección (ej: jose -> José)
+                    }
+                    return match.valor;
+                }
+                return valor; // Si no existe, devuelve el original (se creará)
+            };
+
             // Mapeo flexible de columnas
             const mappedData: ValidatedRow[] = data.map((row, index) => {
                 // Crear un mapa de claves normalizadas a valores
@@ -144,41 +252,56 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
                     normalizedRow[normalizeKey(key)] = row[key];
                 });
 
-                const titulo = normalizedRow['titulo'] || normalizedRow['title'] || '';
-                const descripcion = normalizedRow['descripcion'] || normalizedRow['description'] || normalizedRow['desc'] || '';
+                // Helper para extraer y normalizar
+                const extract = (keys: string[], tipoCatalogo?: CatalogType) => {
+                    let val = '';
+                    for (const k of keys) {
+                        if (normalizedRow[k]) {
+                            val = normalizedRow[k];
+                            break;
+                        }
+                    }
+                    if (tipoCatalogo && val) {
+                        return getNormalizedValue(tipoCatalogo, val.toString());
+                    }
+                    return val;
+                };
 
-                const errors: string[] = [];
-                if (!titulo) errors.push('El título es obligatorio');
-                if (!descripcion) errors.push('La descripción es obligatoria');
+                const rawRow: ImportRow = {
+                    titulo: extract(['titulo', 'title']),
+                    descripcion: extract(['descripcion', 'description', 'desc']),
+                    tarea_sn: extract(['tarea_sn', 'tareasn', 'tarea sn', 'tarea', 'task', 'sn_task']),
+                    ticket_rit: extract(['ticket_rit', 'ticketrit', 'ticket rit', 'ritm', 'ticket', 'rit']),
+                    urgency: extract(['urgencia', 'urgency', 'prioridad', 'priority'], 'urgencia') || 'Media',
+                    tipo: extract(['tipo', 'type', 'tipo requerimiento', 'tipo_requerimiento'], 'tipo_requerimiento') || 'Nuevo Pedido',
+                    dominio: extract(['dominio', 'domain']) || domains[0]?.name || '',
+                    estado: extract(['estado', 'status'], 'estado') || 'Pendiente',
+
+                    solicitante: extract(['solicitante', 'requester'], 'usuario_solicitante'),
+                    asignado_a: extract(['asignado', 'asignado_a', 'assignee'], 'asignado_a'),
+                    priority: extract(['prioridad', 'priority', 'prioridad_negocio', 'prioridad negocio', 'n de prioridad', 'n prioridad', 'prioridad numero'], 'prioridad'), // Prioridad numérica/catálogo
+                    fecha_inicio: parseDate(normalizedRow['fecha_inicio'] || normalizedRow['start_date'] || normalizedRow['inicio']),
+                    fecha_fin: parseDate(normalizedRow['fecha_fin'] || normalizedRow['end_date'] || normalizedRow['fin']),
+                    direccion_solicitante: extract(['direccion', 'direction', 'direccion_solicitante'], 'direccion_solicitante'),
+                    brm: extract(['brm'], 'brm'),
+                    institucion: extract(['institucion', 'institution'], 'institucion'),
+                    tipo_tarea: extract(['tipo_tarea', 'task_type'], 'tipo_tarea'),
+                    complejidad: extract(['complejidad', 'complexity'], 'complejidad'),
+                };
+
+                const validation = validateRow(rawRow);
 
                 return {
                     id: `temp-${index}`,
-                    titulo,
-                    descripcion,
-                    tarea_sn: normalizedRow['tareasn'] || normalizedRow['tarea'] || normalizedRow['task'] || normalizedRow['sn_task'],
-                    ticket_rit: normalizedRow['ticketrit'] || normalizedRow['ritm'] || normalizedRow['ticket'] || normalizedRow['rit'],
-                    prioridad: normalizedRow['prioridad'] || normalizedRow['priority'] || 'Media',
-                    tipo: normalizedRow['tipo'] || normalizedRow['type'] || 'Nuevo Pedido',
-                    dominio: normalizedRow['dominio'] || normalizedRow['domain'] || domains[0]?.name || '',
-                    estado: normalizedRow['estado'] || normalizedRow['status'] || 'Pendiente',
-
-                    solicitante: normalizedRow['solicitante'] || normalizedRow['requester'] || '',
-                    asignado_a: normalizedRow['asignado'] || normalizedRow['assignee'] || '',
-                    prioridad_negocio: normalizedRow['prioridad_negocio'] || normalizedRow['prioridad negocio'] || '',
-                    fecha_inicio: normalizedRow['fecha_inicio'] || normalizedRow['start_date'] || '',
-                    fecha_fin: normalizedRow['fecha_fin'] || normalizedRow['end_date'] || '',
-                    direccion_solicitante: normalizedRow['direccion'] || normalizedRow['direction'] || '',
-                    brm: normalizedRow['brm'] || '',
-                    institucion: normalizedRow['institucion'] || normalizedRow['institution'] || '',
-                    tipo_tarea: normalizedRow['tipo_tarea'] || normalizedRow['task_type'] || '',
-                    complejidad: normalizedRow['complejidad'] || normalizedRow['complexity'] || '',
-
-                    isValid: errors.length === 0,
-                    errors
+                    ...rawRow,
+                    isValid: validation.isValid,
+                    errors: validation.errors,
+                    fieldErrors: validation.fieldErrors
                 };
             });
 
             setImportData(mappedData);
+            setNormalizationCount(normCounter);
             setMode('import');
         };
         reader.readAsBinaryString(file);
@@ -197,13 +320,13 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
                 description: row.descripcion,
                 tareaSN: row.tarea_sn,
                 ticketRIT: row.ticket_rit,
-                priority: (row.prioridad as Priority) || Priority.Medium,
+                urgency: (row.urgency as Urgency) || Urgency.Medium,
                 type: (row.tipo as RequestType) || RequestType.NewOrder,
                 domain: row.dominio || domains[0]?.name || 'General',
                 status: row.estado as Status || Status.Pending,
                 requester: row.solicitante || 'Importado',
                 assigneeId: row.asignado_a || null,
-                prioridadNegocio: row.prioridad_negocio || null,
+                priority: row.priority || null,
                 fechaInicio: row.fecha_inicio || undefined,
                 fechaFin: row.fecha_fin || undefined,
                 direccionSolicitante: row.direccion_solicitante || undefined,
@@ -233,15 +356,15 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
         setImportData(prev => prev.map(row => {
             if (row.id !== id) return row;
 
-            const updated = { ...row, [field]: value };
-            const errors: string[] = [];
-            if (!updated.titulo) errors.push('El título es obligatorio');
-            if (!updated.descripcion) errors.push('La descripción es obligatoria');
+            const updated: ImportRow = { ...row, [field]: value };
+            const validation = validateRow(updated);
 
             return {
                 ...updated,
-                isValid: errors.length === 0,
-                errors
+                id: row.id, // Preserve ID
+                isValid: validation.isValid,
+                errors: validation.errors,
+                fieldErrors: validation.fieldErrors
             };
         }));
     };
@@ -253,6 +376,12 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
                     <div>
                         <h2 className="text-lg font-bold text-slate-800">Vista Previa de Importación</h2>
                         <p className="text-sm text-slate-500">Revisa y corrige los datos antes de guardar.</p>
+                        {normalizationCount > 0 && (
+                            <div className="mt-2 flex items-center gap-2 text-amber-700 bg-amber-50 p-2 rounded text-xs border border-amber-200">
+                                <AlertCircle size={16} />
+                                <span>Se han normalizado <strong>{normalizationCount}</strong> valores para coincidir con el catálogo existente (ej: Jose → José).</span>
+                            </div>
+                        )}
                     </div>
                     <div className="flex gap-2">
                         <button
@@ -284,11 +413,11 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[150px]">Dominio</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[150px]">Estado</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[150px]">Tipo</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[150px]">Prioridad</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[150px]">Urgencia</th>
 
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[120px]">Tarea SN</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[120px]">Ticket RIT</th>
-                                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[120px]">N° Prioridad</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[120px]">Prioridad</th>
 
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[180px]">Solicitante</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[180px]">Dirección</th>
@@ -313,37 +442,40 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
                                                 ? <CheckCircle className="text-green-500" size={20} />
                                                 : <div className="group relative">
                                                     <AlertCircle className="text-red-500" size={20} />
-                                                    <div className="absolute left-6 top-0 bg-red-800 text-white text-xs p-2 rounded w-48 hidden group-hover:block z-50 shadow-lg">
-                                                        {row.errors.join(', ')}
+                                                    <div className="absolute left-6 top-0 bg-red-800 text-white text-xs p-2 rounded w-64 hidden group-hover:block z-50 shadow-lg cursor-pointer">
+                                                        <ul className="list-disc pl-3">
+                                                            {row.errors.map((err, i) => <li key={i}>{err}</li>)}
+                                                        </ul>
                                                     </div>
                                                 </div>
                                             }
                                         </td>
-                                        <td className="px-4 py-2">
+                                        <td className={`px-4 py-2 ${row.fieldErrors['titulo'] ? 'bg-red-100' : ''}`}>
                                             <input type="text" value={row.titulo} onChange={e => handleUpdateRow(row.id, 'titulo', e.target.value)}
-                                                className={`w-full border p-1 rounded text-sm ${!row.titulo ? 'border-red-300 bg-red-50' : 'border-slate-200'}`} />
+                                                className={`w-full border p-1 rounded text-sm ${row.fieldErrors['titulo'] ? 'border-red-500 bg-red-50' : 'border-slate-200'}`} />
                                         </td>
-                                        <td className="px-4 py-2">
+                                        <td className={`px-4 py-2 ${row.fieldErrors['descripcion'] ? 'bg-red-100' : ''}`}>
                                             <textarea rows={1} value={row.descripcion} onChange={e => handleUpdateRow(row.id, 'descripcion', e.target.value)}
-                                                className={`w-full border p-1 rounded text-sm ${!row.descripcion ? 'border-red-300 bg-red-50' : 'border-slate-200'}`} />
+                                                className={`w-full border p-1 rounded text-sm ${row.fieldErrors['descripcion'] ? 'border-red-500 bg-red-50' : 'border-slate-200'}`} />
                                         </td>
 
-                                        <td className="px-4 py-2">
-                                            <select value={row.dominio} onChange={e => handleUpdateRow(row.id, 'dominio', e.target.value)} className="w-full text-xs p-1 border rounded">
+                                        <td className={`px-4 py-2 ${row.fieldErrors['dominio'] ? 'bg-red-100' : ''}`}>
+                                            <select value={row.dominio} onChange={e => handleUpdateRow(row.id, 'dominio', e.target.value)}
+                                                className={`w-full text-xs p-1 border rounded ${row.fieldErrors['dominio'] ? 'border-red-500 bg-red-50' : ''}`}>
                                                 {domains.filter(d => d.isActive).map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                                             </select>
                                         </td>
-                                        <td className="px-4 py-2">
+                                        <td className={`px-4 py-2 ${row.fieldErrors['estado'] ? 'bg-red-100' : ''}`}>
                                             <SelectorCampo valor={row.estado || ''} onChange={v => handleUpdateRow(row.id, 'estado', v)}
-                                                opciones={getCats('estado')} modo={getM('estado')} fallbackOptions={Object.values(Status)} compact />
+                                                opciones={getOptionsWithCurrent('estado', row.estado)} modo={getM('estado')} compact />
                                         </td>
-                                        <td className="px-4 py-2">
+                                        <td className={`px-4 py-2 ${row.fieldErrors['tipo'] ? 'bg-red-100' : ''}`}>
                                             <SelectorCampo valor={row.tipo || ''} onChange={v => handleUpdateRow(row.id, 'tipo', v)}
-                                                opciones={getCats('tipo_requerimiento')} modo={getM('tipo_requerimiento')} fallbackOptions={Object.values(RequestType)} compact />
+                                                opciones={getOptionsWithCurrent('tipo_requerimiento', row.tipo)} modo={getM('tipo_requerimiento')} compact />
                                         </td>
-                                        <td className="px-4 py-2">
-                                            <SelectorCampo valor={row.prioridad || ''} onChange={v => handleUpdateRow(row.id, 'prioridad', v)}
-                                                opciones={getCats('prioridad_negocio')} modo={getM('prioridad_negocio')} fallbackOptions={Object.values(Priority)} compact />
+                                        <td className={`px-4 py-2 ${row.fieldErrors['urgency'] ? 'bg-red-100' : ''}`}>
+                                            <SelectorCampo valor={row.urgency || ''} onChange={v => handleUpdateRow(row.id, 'urgency', v)}
+                                                opciones={getOptionsWithCurrent('urgencia', row.urgency)} modo={getM('urgencia')} compact />
                                         </td>
 
                                         <td className="px-4 py-2">
@@ -353,45 +485,46 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
                                             <input type="text" value={row.ticket_rit || ''} onChange={e => handleUpdateRow(row.id, 'ticket_rit', e.target.value)} className="w-full text-xs border rounded p-1" />
                                         </td>
                                         <td className="px-4 py-2">
-                                            <input type="text" value={row.prioridad_negocio || ''} onChange={e => handleUpdateRow(row.id, 'prioridad_negocio', e.target.value)} className="w-full text-xs border rounded p-1" />
+                                            <input type="text" value={row.priority || ''} onChange={e => handleUpdateRow(row.id, 'priority', e.target.value)} className="w-full text-xs border rounded p-1" />
                                         </td>
 
-                                        <td className="px-4 py-2">
+                                        <td className={`px-4 py-2 ${row.fieldErrors['solicitante'] ? 'bg-red-100' : ''}`}>
                                             <SelectorCampo valor={row.solicitante || ''} onChange={v => handleUpdateRow(row.id, 'solicitante', v)}
-                                                opciones={getCats('usuario_solicitante')} modo={getM('usuario_solicitante')} placeholder="Nombre..." compact />
-                                            {/* Fallback input if selector empty handled by compact mode/selector */}
+                                                opciones={getOptionsWithCurrent('usuario_solicitante', row.solicitante)} modo={getM('usuario_solicitante')} placeholder="Nombre..." compact />
                                         </td>
                                         <td className="px-4 py-2">
                                             <SelectorCampo valor={row.direccion_solicitante || ''} onChange={v => handleUpdateRow(row.id, 'direccion_solicitante', v)}
-                                                opciones={getCats('direccion_solicitante')} modo={getM('direccion_solicitante')} compact />
+                                                opciones={getOptionsWithCurrent('direccion_solicitante', row.direccion_solicitante)} modo={getM('direccion_solicitante')} compact />
                                         </td>
                                         <td className="px-4 py-2">
                                             <SelectorCampo valor={row.institucion || ''} onChange={v => handleUpdateRow(row.id, 'institucion', v)}
-                                                opciones={getCats('institucion')} modo={getM('institucion')} compact />
+                                                opciones={getOptionsWithCurrent('institucion', row.institucion)} modo={getM('institucion')} compact />
                                         </td>
                                         <td className="px-4 py-2">
                                             <SelectorCampo valor={row.brm || ''} onChange={v => handleUpdateRow(row.id, 'brm', v)}
-                                                opciones={getCats('brm')} modo={getM('brm')} compact />
+                                                opciones={getOptionsWithCurrent('brm', row.brm)} modo={getM('brm')} compact />
                                         </td>
                                         <td className="px-4 py-2">
                                             <SelectorCampo valor={row.asignado_a || ''} onChange={v => handleUpdateRow(row.id, 'asignado_a', v)}
-                                                opciones={getCats('asignado_a')} modo={getM('asignado_a')} compact />
+                                                opciones={getOptionsWithCurrent('asignado_a', row.asignado_a)} modo={getM('asignado_a')} compact />
                                         </td>
 
-                                        <td className="px-4 py-2">
+                                        <td className={`px-4 py-2 ${row.fieldErrors['tipo_tarea'] ? 'bg-red-100' : ''}`}>
                                             <SelectorCampo valor={row.tipo_tarea || ''} onChange={v => handleUpdateRow(row.id, 'tipo_tarea', v)}
-                                                opciones={getCats('tipo_tarea')} modo={getM('tipo_tarea')} compact />
+                                                opciones={getOptionsWithCurrent('tipo_tarea', row.tipo_tarea)} modo={getM('tipo_tarea')} compact />
                                         </td>
-                                        <td className="px-4 py-2">
+                                        <td className={`px-4 py-2 ${row.fieldErrors['complejidad'] ? 'bg-red-100' : ''}`}>
                                             <SelectorCampo valor={row.complejidad || ''} onChange={v => handleUpdateRow(row.id, 'complejidad', v)}
-                                                opciones={getCats('complejidad')} modo={getM('complejidad')} compact />
+                                                opciones={getOptionsWithCurrent('complejidad', row.complejidad)} modo={getM('complejidad')} compact />
                                         </td>
 
-                                        <td className="px-4 py-2">
-                                            <input type="date" value={row.fecha_inicio || ''} onChange={e => handleUpdateRow(row.id, 'fecha_inicio', e.target.value)} className="w-full text-xs border rounded p-1" />
+                                        <td className={`px-4 py-2 ${row.fieldErrors['fecha_inicio'] ? 'bg-red-100' : ''}`}>
+                                            <input type="date" value={row.fecha_inicio || ''} onChange={e => handleUpdateRow(row.id, 'fecha_inicio', e.target.value)}
+                                                className={`w-full text-xs border rounded p-1 ${row.fieldErrors['fecha_inicio'] ? 'border-red-500 bg-red-50' : ''}`} />
                                         </td>
-                                        <td className="px-4 py-2">
-                                            <input type="date" value={row.fecha_fin || ''} onChange={e => handleUpdateRow(row.id, 'fecha_fin', e.target.value)} className="w-full text-xs border rounded p-1" />
+                                        <td className={`px-4 py-2 ${row.fieldErrors['fecha_fin'] ? 'bg-red-100' : ''}`}>
+                                            <input type="date" value={row.fecha_fin || ''} onChange={e => handleUpdateRow(row.id, 'fecha_fin', e.target.value)}
+                                                className={`w-full text-xs border rounded p-1 ${row.fieldErrors['fecha_fin'] ? 'border-red-500 bg-red-50' : ''}`} />
                                         </td>
 
                                         <td className="px-4 py-2 text-right sticky right-0 bg-white z-10">

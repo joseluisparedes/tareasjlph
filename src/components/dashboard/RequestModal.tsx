@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ITRequest, RequestType, Priority, Status, CatalogItem, CatalogoItem, CatalogType } from '../../types';
+import { ITRequest, RequestType, Urgency, Status, CatalogItem, CatalogoItem, CatalogType } from '../../types';
 import type { SolicitudFecha, SolicitudApunte } from '../../lib/supabase/tipos-bd';
 import { apuntesApi } from '../../lib/api/apuntes';
 import { X, Save, Calendar, Hash, FileText, History, User, Grid } from 'lucide-react';
@@ -29,7 +29,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
 
     // Obtener cada lista para pasarlas al render
     const tiposReq = getCats('tipo_requerimiento');
-    const prioridades = getCats('prioridad_negocio');
+    const urgencias = getCats('urgencia');
     const estados = getCats('estado');
     const usuarios = getCats('usuario_solicitante');
     const asignados = getCats('asignado_a');
@@ -59,9 +59,9 @@ export const RequestModal: React.FC<RequestModalProps> = ({
         } else {
             setFormData({
                 title: '', description: '',
-                type: '' as RequestType, domain: '', priority: '' as Priority, status: '' as Status,
+                type: '' as RequestType, domain: '', urgency: '' as Urgency, status: '' as Status,
                 requester: '', assigneeId: null,
-                prioridadNegocio: '', tareaSN: '', ticketRIT: '',
+                priority: '', tareaSN: '', ticketRIT: '',
                 fechaInicio: '', fechaFin: '',
                 // Nuevos campos vacíos
                 direccionSolicitante: '', brm: '', institucion: '', tipoTarea: '', complejidad: ''
@@ -302,15 +302,15 @@ export const RequestModal: React.FC<RequestModalProps> = ({
 
                                     <SelectorCampo label="Tipo Requerimiento" required
                                         valor={formData.type || ''} onChange={v => set('type', v)}
-                                        opciones={tiposReq} modo={getM('tipo_requerimiento')} fallbackOptions={Object.values(RequestType)} />
+                                        opciones={tiposReq} modo={getM('tipo_requerimiento')} />
 
-                                    <SelectorCampo label="Prioridad Negocio" required
-                                        valor={formData.priority || ''} onChange={v => set('priority', v)}
-                                        opciones={prioridades} modo={getM('prioridad_negocio')} fallbackOptions={Object.values(Priority)} />
+                                    <SelectorCampo label="Urgencia" required
+                                        valor={formData.urgency || ''} onChange={v => set('urgency', v)}
+                                        opciones={urgencias} modo={getM('urgencia')} />
 
                                     <SelectorCampo label="Estado" required
                                         valor={formData.status || ''} onChange={v => set('status', v)}
-                                        opciones={estados} modo={getM('estado')} fallbackOptions={Object.values(Status)} />
+                                        opciones={estados} modo={getM('estado')} />
 
                                     <SelectorCampo label="Complejidad"
                                         valor={formData.complejidad || ''} onChange={v => set('complejidad', v)}
@@ -378,9 +378,9 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                         opciones={asignados} modo={getM('asignado_a')} placeholder="-- Sin asignar --" />
 
                                     <div className="col-span-6 sm:col-span-2">
-                                        <label className={labelClass}>N° Prioridad</label>
+                                        <label className={labelClass}>Prioridad</label>
                                         <input type="text" className={inputClass}
-                                            value={formData.prioridadNegocio || ''} onChange={e => set('prioridadNegocio', e.target.value)}
+                                            value={formData.priority || ''} onChange={e => set('priority', e.target.value)}
                                             placeholder="P-001" />
                                     </div>
                                     <div className="col-span-6 sm:col-span-2">

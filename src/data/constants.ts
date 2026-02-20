@@ -1,4 +1,4 @@
-import { ITRequest, Priority, RequestType, Status, User, CatalogItem } from '../types';
+import { ITRequest, Urgency, RequestType, Status, User, CatalogItem } from '../types';
 
 export const MOCK_USERS: User[] = [
     { id: 'u1', name: 'Alex Johnson', email: 'alex.j@brm.com', role: 'Administrador', avatarUrl: 'https://picsum.photos/32/32?random=1' },
@@ -23,12 +23,11 @@ export const MOCK_REQUESTS: ITRequest[] = [
         type: RequestType.Incident,
         domain: 'Finanzas',
         requester: 'Juan Pérez',
-        priority: Priority.Critical,
+        urgency: Urgency.Critical,
         status: Status.Analysis,
         assigneeId: 'u1',
         createdAt: '2025-02-10T09:00:00Z',
-        assigneeId: 'u1',
-        createdAt: '2025-02-10T09:00:00Z',
+
         externalId: 'INC-9921',
         direccionSolicitante: 'Contabilidad'
     },
@@ -39,10 +38,10 @@ export const MOCK_REQUESTS: ITRequest[] = [
         type: RequestType.BAU,
         domain: 'RRHH',
         requester: 'Ana Gómez',
-        priority: Priority.Medium,
+        urgency: Urgency.Medium,
         status: Status.Pending,
         assigneeId: null,
-        assigneeId: null,
+
         createdAt: '2025-02-11T14:30:00Z',
         direccionSolicitante: 'Reclutamiento'
     },
@@ -53,11 +52,11 @@ export const MOCK_REQUESTS: ITRequest[] = [
         type: RequestType.NoBAU,
         domain: 'Infraestructura',
         requester: 'Miguel Rojo',
-        priority: Priority.High,
+        urgency: Urgency.High,
         status: Status.Development,
         assigneeId: 'u2',
         createdAt: '2025-02-12T10:15:00Z',
-        createdAt: '2025-02-12T10:15:00Z',
+
         externalId: 'JIRA-4421',
         direccionSolicitante: 'TI Infraestructura'
     },
@@ -68,7 +67,7 @@ export const MOCK_REQUESTS: ITRequest[] = [
         type: RequestType.AdHoc,
         domain: 'Ventas',
         requester: 'Raquel Verde',
-        priority: Priority.Low,
+        urgency: Urgency.Low,
         status: Status.Closed,
         assigneeId: 'u3',
         createdAt: '2025-02-05T08:00:00Z',
@@ -81,7 +80,7 @@ export const MOCK_REQUESTS: ITRequest[] = [
         type: RequestType.Incident,
         domain: 'Finanzas',
         requester: 'Dpto Finanzas',
-        priority: Priority.Critical,
+        urgency: Urgency.Critical,
         status: Status.Testing,
         assigneeId: 'u1',
         createdAt: '2025-02-13T11:00:00Z',
@@ -94,7 +93,7 @@ export const MOCK_REQUESTS: ITRequest[] = [
         type: RequestType.Incident,
         domain: 'Infraestructura',
         requester: 'Mesa de Ayuda',
-        priority: Priority.High,
+        urgency: Urgency.High,
         status: Status.Pending,
         assigneeId: null,
         createdAt: '2025-02-14T09:00:00Z',

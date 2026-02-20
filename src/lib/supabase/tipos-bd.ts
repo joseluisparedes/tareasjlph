@@ -5,7 +5,7 @@ export interface Solicitud {
     tipo_solicitud: 'BAU' | 'No BAU' | 'Incidente' | 'Nuevo Pedido' | 'Ad Hoc';
     dominio_id: string;
     solicitante: string;
-    prioridad: 'Crítica' | 'Alta' | 'Media' | 'Baja';
+    urgencia: 'Crítica' | 'Alta' | 'Media' | 'Baja';
     estado: string;
     asignado_a: string | null; // texto libre (nombre del responsable)
     fecha_vencimiento: string | null;
@@ -14,7 +14,7 @@ export interface Solicitud {
     fecha_actualizacion: string;
     creado_por: string;
     // Nuevos campos
-    prioridad_negocio: string | null;
+    prioridad: string | null;
     tarea_sn: string | null;
     ticket_rit: string | null;
     fecha_inicio: string | null;

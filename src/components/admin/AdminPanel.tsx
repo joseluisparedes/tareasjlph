@@ -20,7 +20,8 @@ type AdminTab = 'domains' | 'catalogs' | 'users';
 
 const CATALOG_SECTIONS: { tipo: CatalogType; label: string }[] = [
     { tipo: 'tipo_requerimiento', label: 'Tipo de Requerimiento' },
-    { tipo: 'prioridad_negocio', label: 'Prioridad del Negocio' },
+    { tipo: 'urgencia', label: 'Urgencia' },
+    { tipo: 'prioridad', label: 'Prioridad' },
     { tipo: 'estado', label: 'Estado' },
     { tipo: 'usuario_solicitante', label: 'Usuario Solicitante' },
     { tipo: 'direccion_solicitante', label: 'Dirección Solicitante' },
@@ -145,7 +146,7 @@ const CatalogSection: React.FC<{
                                 <>
                                     <div className="flex items-center gap-2">
                                         <div className={`w-1.5 h-1.5 rounded-full ${item.esta_activo ? 'bg-green-500' : 'bg-slate-300'}`} />
-                                        {tipo === 'prioridad_negocio' && (
+                                        {tipo === 'urgencia' && (
                                             <label className="cursor-pointer" title="Cambiar color">
                                                 <div className="w-5 h-5 rounded border border-slate-300 shadow-sm flex-shrink-0"
                                                     style={{ backgroundColor: item.color || '#94a3b8' }} />

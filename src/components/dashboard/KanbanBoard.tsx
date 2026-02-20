@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ITRequest, Status, Priority, CatalogoItem } from '../../types';
+import { ITRequest, Status, Urgency, CatalogoItem } from '../../types';
 import { MOCK_USERS } from '../../data/constants';
 import { AlertCircle, GripVertical } from 'lucide-react';
 import {
@@ -31,13 +31,13 @@ interface KanbanBoardProps {
     onEdit: (request: ITRequest) => void;
     onStatusChange: (requestId: string, newStatus: string) => void;
     onDelete?: (id: string) => void;
-    catalogosPrioridad?: CatalogoItem[];
+    catalogosUrgencia?: CatalogoItem[];
     catalogos: CatalogoItem[];
     onColumnOrderChange?: (newOrder: string[]) => void;
 }
 
-const getPriorityStyle = (priority: Priority, catalogos?: CatalogoItem[]) => {
-    const cat = catalogos?.find(c => c.valor === priority && c.esta_activo);
+const getUrgencyStyle = (urgency: Urgency, catalogos?: CatalogoItem[]) => {
+    const cat = catalogos?.find(c => c.valor === urgency && c.esta_activo);
     if (cat?.color) {
         return {
             backgroundColor: `${cat.color}20`,
@@ -46,11 +46,11 @@ const getPriorityStyle = (priority: Priority, catalogos?: CatalogoItem[]) => {
         };
     }
 
-    switch (priority) {
-        case Priority.Critical: return { backgroundColor: '#fee2e2', color: '#b91c1c', borderColor: '#fecaca' };
-        case Priority.High: return { backgroundColor: '#ffedd5', color: '#c2410c', borderColor: '#fed7aa' };
-        case Priority.Medium: return { backgroundColor: '#fef9c3', color: '#a16207', borderColor: '#fde047' };
-        case Priority.Low: return { backgroundColor: '#dcfce7', color: '#15803d', borderColor: '#bbf7d0' };
+    switch (urgency) {
+        case Urgency.Critical: return { backgroundColor: '#fee2e2', color: '#b91c1c', borderColor: '#fecaca' };
+        case Urgency.High: return { backgroundColor: '#ffedd5', color: '#c2410c', borderColor: '#fed7aa' };
+        case Urgency.Medium: return { backgroundColor: '#fef9c3', color: '#a16207', borderColor: '#fde047' };
+        case Urgency.Low: return { backgroundColor: '#dcfce7', color: '#15803d', borderColor: '#bbf7d0' };
         default: return { backgroundColor: '#f1f5f9', color: '#475569', borderColor: '#e2e8f0' };
     }
 };
@@ -60,10 +60,10 @@ interface SortableItemProps {
     req: ITRequest;
     onEdit: (request: ITRequest) => void;
     onDelete?: (id: string) => void;
-    catalogosPrioridad?: CatalogoItem[];
+    catalogosUrgencia?: CatalogoItem[];
 }
 
-const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ req, onEdit, onDelete, catalogosPrioridad, isOverlay }) => {
+const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ req, onEdit, onDelete, catalogosUrgencia, isOverlay }) => {
     const assignee = MOCK_USERS.find(u => u.id === req.assigneeId);
 
     return (
@@ -90,9 +90,9 @@ const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ re
                     </button>
                     <span
                         className="text-[10px] px-2 py-0.5 rounded border font-medium"
-                        style={getPriorityStyle(req.priority, catalogosPrioridad)}
+                        style={getUrgencyStyle(req.urgency, catalogosUrgencia)}
                     >
-                        {req.priority}
+                        {req.urgency}
                     </span>
                 </div>
             </div>
@@ -158,10 +158,10 @@ interface KanbanColumnProps {
     requests: ITRequest[];
     onEdit: (req: ITRequest) => void;
     onDelete?: (id: string) => void;
-    catalogosPrioridad?: CatalogoItem[];
+    catalogosUrgencia?: CatalogoItem[];
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, onDelete, catalogosPrioridad }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, onDelete, catalogosUrgencia }) => {
     const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
         id: status,
         data: { type: 'Column', status },
@@ -201,7 +201,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, o
                             req={req}
                             onEdit={onEdit}
                             onDelete={onDelete}
-                            catalogosPrioridad={catalogosPrioridad}
+                            catalogosUrgencia={catalogosUrgencia}
                         />
                     ))}
                 </SortableContext>
@@ -211,7 +211,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, o
 };
 
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onStatusChange, onDelete, catalogosPrioridad, catalogos, onColumnOrderChange }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onStatusChange, onDelete, catalogosUrgencia, catalogos, onColumnOrderChange }) => {
     // Local state to handle visual reordering immediately
     const [localRequests, setLocalRequests] = useState<ITRequest[]>(requests);
     const [columns, setColumns] = useState<string[]>([]);
@@ -390,7 +390,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
                             requests={localRequests.filter(r => r.status === status)}
                             onEdit={onEdit}
                             onDelete={onDelete}
-                            catalogosPrioridad={catalogosPrioridad}
+                            catalogosUrgencia={catalogosUrgencia}
                         />
                     ))}
                 </SortableContext>
@@ -403,7 +403,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
                             req={activeItem as ITRequest}
                             onEdit={() => { }}
                             onDelete={undefined}
-                            catalogosPrioridad={catalogosPrioridad}
+                            catalogosUrgencia={catalogosUrgencia}
                             isOverlay
                         />
                     </div>

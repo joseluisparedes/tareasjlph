@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { ITRequest, DashboardView, FilterState, RequestType, Priority, Status, CatalogItem, CatalogoItem } from '../../types';
+import { ITRequest, DashboardView, FilterState, RequestType, Urgency, Status, CatalogItem, CatalogoItem } from '../../types';
 import { KanbanBoard } from './KanbanBoard';
 import { RequestTable } from './RequestTable';
-import { LayoutGrid, List, Search, Filter, Plus, DownloadCloud } from 'lucide-react';
+import { LayoutGrid, List, Search, Filter, Plus, DownloadCloud, Save, Trash2, X } from 'lucide-react';
+import { supabase } from '../../lib/supabase/cliente';
 
 interface DashboardProps {
     requests: ITRequest[];
@@ -23,8 +24,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
     const [filters, setFilters] = useState<FilterState>({
         domain: [],
         type: [],
-        priority: [],
+        urgency: [],
         status: [],
+        direction: [],
+        requester: [],
         search: ''
     });
 
@@ -33,8 +36,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
             if (filters.search && !req.title.toLowerCase().includes(filters.search.toLowerCase()) && !req.id.toLowerCase().includes(filters.search.toLowerCase())) return false;
             if (filters.domain.length > 0 && !filters.domain.includes(req.domain)) return false;
             if (filters.type.length > 0 && !filters.type.includes(req.type)) return false;
-            if (filters.priority.length > 0 && !filters.priority.includes(req.priority)) return false;
+            if (filters.urgency.length > 0 && !filters.urgency.includes(req.urgency)) return false;
             if (filters.status.length > 0 && !filters.status.includes(req.status)) return false;
+
+            // Nuevos filtros
+            if (filters.direction.length > 0 && (!req.direccionSolicitante || !filters.direction.includes(req.direccionSolicitante))) return false;
+            if (filters.requester.length > 0 && (!req.requester || !filters.requester.includes(req.requester))) return false;
+
             return true;
         });
     }, [requests, filters]);
@@ -48,6 +56,72 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                 return { ...prev, [key]: [...currentArray, value] };
             }
         });
+    };
+
+    // Helper para obtener opciones únicas de catálogos
+    const uniqueDirections = useMemo(() =>
+        Array.from(new Set(catalogos.filter(c => c.tipo === 'direccion_solicitante' && c.esta_activo).map(c => c.valor))),
+        [catalogos]);
+
+    const uniqueRequesters = useMemo(() =>
+        Array.from(new Set(catalogos.filter(c => c.tipo === 'usuario_solicitante' && c.esta_activo).map(c => c.valor))),
+        [catalogos]);
+
+
+
+    // --- Lógica de Filtros Guardados ---
+    const [savedFilters, setSavedFilters] = useState<{ id: string, name: string, config: FilterState }[]>([]);
+    const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
+    const [newFilterName, setNewFilterName] = useState('');
+    const [showSaveInput, setShowSaveInput] = useState(false);
+
+    // Cargar filtros al inicio
+    React.useEffect(() => {
+        const fetchFilters = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('saved_filters')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+
+            if (data) setSavedFilters(data);
+        };
+        fetchFilters();
+    }, []);
+
+    const handleSaveFilter = async () => {
+        if (!newFilterName.trim()) return;
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase.from('saved_filters').insert({
+            user_id: user.id,
+            name: newFilterName,
+            config: filters
+        }).select().single();
+
+        if (data) {
+            setSavedFilters([data, ...savedFilters]);
+            setNewFilterName('');
+            setShowSaveInput(false);
+        }
+    };
+
+    const handleLoadFilter = (filter: { config: FilterState }) => {
+        setFilters(filter.config);
+        setIsFilterMenuOpen(false);
+    };
+
+    const handleDeleteFilter = async (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const { error } = await supabase.from('saved_filters').delete().eq('id', id);
+        if (!error) {
+            setSavedFilters(prev => prev.filter(f => f.id !== id));
+        }
     };
 
     return (
@@ -66,6 +140,67 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         />
                     </div>
                     <div className="h-8 w-px bg-slate-200 mx-2"></div>
+
+                    {/* Filtros Guardados */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
+                            className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors"
+                        >
+                            <Filter size={16} />
+                            Mis Filtros
+                        </button>
+
+                        {isFilterMenuOpen && (
+                            <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-slate-200 z-50 p-2">
+                                <div className="mb-2 pb-2 border-b border-slate-100">
+                                    {!showSaveInput ? (
+                                        <button
+                                            onClick={() => setShowSaveInput(true)}
+                                            className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-md font-medium flex items-center gap-2"
+                                        >
+                                            <Plus size={14} /> Guardar filtro actual
+                                        </button>
+                                    ) : (
+                                        <div className="flex gap-2 p-1">
+                                            <input
+                                                autoFocus
+                                                type="text"
+                                                placeholder="Nombre del filtro..."
+                                                className="flex-1 text-sm border rounded px-2 py-1"
+                                                value={newFilterName}
+                                                onChange={e => setNewFilterName(e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && handleSaveFilter()}
+                                            />
+                                            <button onClick={handleSaveFilter} className="text-blue-600 hover:text-blue-800"><Save size={16} /></button>
+                                            <button onClick={() => setShowSaveInput(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="max-h-60 overflow-y-auto">
+                                    {savedFilters.length === 0 ? (
+                                        <p className="text-xs text-slate-400 text-center py-2">No tienes filtros guardados</p>
+                                    ) : (
+                                        savedFilters.map(filter => (
+                                            <div key={filter.id}
+                                                onClick={() => handleLoadFilter(filter)}
+                                                className="group flex items-center justify-between px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
+                                            >
+                                                <span>{filter.name}</span>
+                                                <button
+                                                    onClick={(e) => handleDeleteFilter(filter.id, e)}
+                                                    className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-opacity"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="flex bg-slate-100 p-1 rounded-lg">
                         <button
                             onClick={() => setViewMode('Kanban')}
@@ -109,7 +244,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                 </span>
 
                 <select
-                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white max-w-[150px]"
                     onChange={(e) => e.target.value && handleFilterChange('domain', e.target.value)}
                     value=""
                 >
@@ -120,43 +255,74 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                 </select>
 
                 <select
-                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white max-w-[150px]"
                     onChange={(e) => e.target.value && handleFilterChange('type', e.target.value)}
                     value=""
                 >
                     <option value="">Tipo</option>
-                    {Object.values(RequestType).map(t => <option key={t} value={t}>{t}</option>)}
+                    {Array.from(new Set(catalogos.filter(c => c.tipo === 'tipo_requerimiento' && c.esta_activo).map(c => c.valor))).sort().map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
 
                 <select
-                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                    onChange={(e) => e.target.value && handleFilterChange('priority', e.target.value)}
+                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white max-w-[150px]"
+                    onChange={(e) => e.target.value && handleFilterChange('urgency', e.target.value)}
                     value=""
                 >
-                    <option value="">Prioridad</option>
-                    {Object.values(Priority).map(p => <option key={p} value={p}>{p}</option>)}
+                    <option value="">Urgencia</option>
+                    {Array.from(new Set(catalogos.filter(c => c.tipo === 'urgencia' && c.esta_activo).map(c => c.valor))).sort().map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+
+                {/* Nuevos Filtros */}
+                <select
+                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white max-w-[150px]"
+                    onChange={(e) => e.target.value && handleFilterChange('status', e.target.value)}
+                    value=""
+                >
+                    <option value="">Estado</option>
+                    {Array.from(new Set(catalogos.filter(c => c.tipo === 'estado' && c.esta_activo).map(c => c.valor))).sort().map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+
+                <select
+                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white max-w-[150px]"
+                    onChange={(e) => e.target.value && handleFilterChange('direction', e.target.value)}
+                    value=""
+                >
+                    <option value="">Dirección</option>
+                    {uniqueDirections.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+
+                <select
+                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white max-w-[150px]"
+                    onChange={(e) => e.target.value && handleFilterChange('requester', e.target.value)}
+                    value=""
+                >
+                    <option value="">Solicitante</option>
+                    {uniqueRequesters.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
 
                 {/* Active Filters Display */}
                 <div className="flex flex-wrap gap-2 ml-auto">
-                    {[...filters.domain, ...filters.type, ...filters.priority, ...filters.status].map((f, i) => (
+                    {[
+                        ...filters.domain.map(f => ({ key: 'domain', val: f })),
+                        ...filters.type.map(f => ({ key: 'type', val: f })),
+                        ...filters.urgency.map(f => ({ key: 'urgency', val: f })),
+                        ...filters.status.map(f => ({ key: 'status', val: f })),
+                        ...filters.direction.map(f => ({ key: 'direction', val: f })),
+                        ...filters.requester.map(f => ({ key: 'requester', val: f }))
+                    ].map((item, i) => (
                         <span key={i} className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs flex items-center gap-1 border border-blue-100">
-                            {f}
+                            {item.val}
                             <button
-                                onClick={() => {
-                                    if (Object.values(RequestType).includes(f as any)) handleFilterChange('type', f);
-                                    else if (Object.values(Priority).includes(f as any)) handleFilterChange('priority', f);
-                                    else handleFilterChange('domain', f);
-                                }}
+                                onClick={() => handleFilterChange(item.key as keyof FilterState, item.val)}
                                 className="hover:bg-blue-200 rounded-full p-0.5"
                             >
                                 <Plus size={10} className="rotate-45" />
                             </button>
                         </span>
                     ))}
-                    {(filters.domain.length || filters.type.length || filters.priority.length) ? (
+                    {(filters.domain.length || filters.type.length || filters.urgency.length || filters.status.length || filters.direction.length || filters.requester.length) ? (
                         <button
-                            onClick={() => setFilters({ domain: [], type: [], priority: [], status: [], search: '' })}
+                            onClick={() => setFilters({ domain: [], type: [], urgency: [], status: [], direction: [], requester: [], search: '' })}
                             className="text-slate-400 hover:text-red-500 text-xs underline"
                         >
                             Limpiar todo
@@ -172,7 +338,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         requests={filteredRequests}
                         onEdit={onEditRequest}
                         onStatusChange={onStatusChange}
-                        catalogosPrioridad={catalogos.filter(c => c.tipo === 'prioridad_negocio')}
+                        catalogosUrgencia={catalogos.filter(c => c.tipo === 'urgencia')}
                         catalogos={catalogos}
                         onColumnOrderChange={onUpdateCatalogoOrder}
                     />
@@ -182,7 +348,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         onEdit={onEditRequest}
                         onDelete={onDelete}
                         onDeleteBulk={onDeleteBulk}
-                        catalogosPrioridad={catalogos.filter(c => c.tipo === 'prioridad_negocio')}
+                        catalogosUrgencia={catalogos.filter(c => c.tipo === 'urgencia')}
                         onUpdateRequest={onUpdateRequest}
                         domains={domains}
                         catalogos={catalogos}

@@ -6,7 +6,7 @@ export enum RequestType {
     AdHoc = 'Ad Hoc'
 }
 
-export enum Priority {
+export enum Urgency {
     Critical = 'Crítica',
     High = 'Alta',
     Medium = 'Media',
@@ -36,7 +36,8 @@ export interface ITRequest {
     type: RequestType;
     domain: string;
     requester: string;
-    priority: Priority;
+    urgency: Urgency;
+    priority: string;
     status: Status;
     assigneeId: string | null;
     createdAt: string;
@@ -57,7 +58,7 @@ export type DashboardView = 'Kanban' | 'Table';
 export interface FilterState {
     domain: string[];
     type: RequestType[];
-    priority: Priority[];
+    urgency: Urgency[];
     status: Status[];
     search: string;
 }

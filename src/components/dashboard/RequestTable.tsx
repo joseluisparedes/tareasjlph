@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { ITRequest, CatalogoItem, Priority, RequestType, Status, CatalogItem } from '../../types';
+import { ITRequest, CatalogoItem, Urgency, RequestType, Status, CatalogItem } from '../../types';
 import { MoreHorizontal, Trash2, CheckSquare, Square, MinusSquare, ArrowUpDown, ArrowUp, ArrowDown, Settings, Eye, EyeOff, Download, GripVertical, Calendar } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -11,7 +11,7 @@ interface RequestTableProps {
     onEdit: (request: ITRequest) => void;
     onDelete: (id: string) => void;
     onDeleteBulk: (ids: string[]) => void;
-    catalogosPrioridad?: CatalogoItem[];
+    catalogosUrgencia?: CatalogoItem[];
     // New props for inline editing
     onUpdateRequest?: (id: string, data: Partial<ITRequest>) => Promise<void>;
     domains?: CatalogItem[];
@@ -61,7 +61,7 @@ const PriorityBadge: React.FC<{ priority: string; catalogos?: CatalogoItem[] }> 
 type SortDirection = 'asc' | 'desc' | null;
 
 interface SortConfig {
-    key: keyof ITRequest | 'priorityValue'; // priorityValue is a virtual key for custom sorting
+    key: keyof ITRequest | 'urgencyValue'; // urgencyValue is a virtual key for custom sorting
     direction: SortDirection;
 }
 
@@ -80,9 +80,11 @@ interface SortableHeaderProps {
     children: React.ReactNode;
     onClick?: () => void;
     className?: string;
+    width?: number;
+    onResize?: (width: number) => void;
 }
 
-const SortableHeader: React.FC<SortableHeaderProps> = ({ id, children, onClick, className }) => {
+const SortableHeader: React.FC<SortableHeaderProps> = ({ id, children, onClick, className, width, onResize }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
     const style: React.CSSProperties = {
@@ -91,26 +93,85 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({ id, children, onClick, 
         opacity: isDragging ? 0.5 : 1,
         zIndex: isDragging ? 100 : 'auto',
         position: 'relative',
-        touchAction: 'none'
+        touchAction: 'none',
+        width: width,
+        minWidth: width, // Asegurar que respete el ancho
+        maxWidth: width  // Asegurar que respete el ancho
+    };
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (!onResize) return;
+        e.preventDefault();
+        e.stopPropagation(); // Evitar drag del sortable
+
+        const startX = e.pageX;
+        const startWidth = width || 100; // Fallback width
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const currentX = moveEvent.pageX;
+            const diff = currentX - startX;
+            onResize(startWidth + diff);
+        };
+
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = '';
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        document.body.style.cursor = 'col-resize';
     };
 
     return (
-        <th ref={setNodeRef} style={style} className={`${className} whitespace-nowrap`} scope="col">
-            <div className="flex items-center gap-1 group/header">
-                <button {...attributes} {...listeners} className="cursor-grab text-slate-300 hover:text-slate-500 opacity-0 group-hover/header:opacity-100 transition-opacity p-0.5 rounded hover:bg-slate-200">
+        <th ref={setNodeRef} style={style} className={`${className} whitespace-nowrap group/th relative`} scope="col">
+            <div className="flex items-center gap-1 group/header w-full overflow-hidden">
+                <button {...attributes} {...listeners} className="cursor-grab text-slate-300 hover:text-slate-500 opacity-0 group-hover/header:opacity-100 transition-opacity p-0.5 rounded hover:bg-slate-200 shrink-0">
                     <GripVertical size={14} />
                 </button>
-                <div onClick={onClick} className="flex-1 flex items-center gap-1 cursor-pointer select-none">
+                <div onClick={onClick} className="flex-1 flex items-center gap-1 cursor-pointer select-none overflow-hidden text-ellipsis">
                     {children}
                 </div>
             </div>
+            {onResize && (
+                <div
+                    onMouseDown={handleMouseDown}
+                    onClick={(e) => e.stopPropagation()}
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 opacity-0 group-hover/th:opacity-100 z-50 transition-colors"
+                />
+            )}
         </th>
     );
 };
 
-export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, onDelete, onDeleteBulk, catalogosPrioridad, onUpdateRequest, domains, catalogos }) => {
+export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, onDelete, onDeleteBulk, catalogosUrgencia, onUpdateRequest, domains, catalogos }) => {
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const STORAGE_KEY = 'requestTableConfig';
+    const WIDTHS_STORAGE_KEY = 'requestTableWidths';
+
+    // Estado para anchos de columnas
+    const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+        try {
+            const saved = localStorage.getItem(WIDTHS_STORAGE_KEY);
+            return saved ? JSON.parse(saved) : {};
+        } catch (e) {
+            console.error('Error loading widths', e);
+            return {};
+        }
+    });
+
+    // Persistir anchos
+    useEffect(() => {
+        localStorage.setItem(WIDTHS_STORAGE_KEY, JSON.stringify(columnWidths));
+    }, [columnWidths]);
+
+    const handleColumnResize = (colId: string, newWidth: number) => {
+        setColumnWidths(prev => ({
+            ...prev,
+            [colId]: Math.max(50, newWidth) // Mínimo 50px
+        }));
+    };
 
     // Estado para edición en línea
     const [editingCell, setEditingCell] = useState<{ id: string, field: string, value: any } | null>(null);
@@ -172,13 +233,13 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
             return domains?.filter(d => d.isActive).map(d => ({ value: d.name, label: d.name })) || [];
         }
         if (key === 'type') {
-            return Object.values(RequestType).map(v => ({ value: v, label: v }));
+            return catalogos?.filter(c => c.tipo === 'tipo_requerimiento' && c.esta_activo).map(c => ({ value: c.valor, label: c.valor })) || [];
         }
-        if (key === 'priority') {
-            return Object.values(Priority).map(v => ({ value: v, label: v }));
+        if (key === 'urgency') {
+            return catalogos?.filter(c => c.tipo === 'urgencia' && c.esta_activo).map(c => ({ value: c.valor, label: c.valor })) || [];
         }
         if (key === 'status') {
-            return Object.values(Status).map(v => ({ value: v, label: v }));
+            return catalogos?.filter(c => c.tipo === 'estado' && c.esta_activo).map(c => ({ value: c.valor, label: c.valor })) || [];
         }
         if (key === 'requester') {
             return catalogos?.filter(c => c.tipo === 'usuario_solicitante' && c.esta_activo).map(c => ({ value: c.valor, label: c.valor })) || [];
@@ -259,16 +320,19 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         );
     };
 
+
+
+    // ... inside RequestTable ...
     // Definición de todas las columnas posibles
     const allColumns: (ColumnConfig & { id: string })[] = [
         { id: 'id', key: 'id' as keyof ITRequest, label: 'ID', sortable: true, editable: false },
         {
             id: 'title', key: 'title', label: 'Título', sortable: true, editable: true, inputType: 'text',
             render: (req) => (
-                editingCell?.id === req.id && editingCell.field === 'title' ? null : // Don't render custom if editing (handled by renderCellContent logic fallback, but safe to handle)
-                    <div className="flex flex-col">
-                        <div className="truncate max-w-xs font-medium text-gray-900" title={req.title}>{req.title}</div>
-                        {req.externalId && <span className="text-[10px] text-indigo-500">🔗 {req.externalId}</span>}
+                editingCell?.id === req.id && editingCell.field === 'title' ? null : // Don't render custom if editing
+                    <div className="flex flex-col w-full">
+                        <span className="font-medium text-gray-900 break-words">{req.title}</span>
+                        {req.externalId && <span className="text-[10px] text-indigo-500 truncate">🔗 {req.externalId}</span>}
                     </div>
             )
         },
@@ -287,11 +351,11 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
             )
         },
         {
-            id: 'priority', key: 'priority', label: 'Prioridad del Negocio', sortable: true, editable: true, inputType: 'select',
-            render: (req) => <PriorityBadge priority={req.priority} catalogos={catalogosPrioridad} />
+            id: 'urgency', key: 'urgency', label: 'Urgencia', sortable: true, editable: true, inputType: 'select',
+            render: (req) => <PriorityBadge priority={req.urgency} catalogos={catalogosUrgencia} />
         },
-        // Nueva columna N° Prioridad (prioridadNegocio)
-        { id: 'prioridadNegocio', key: 'prioridadNegocio' as keyof ITRequest, label: 'N° Prioridad', sortable: true, editable: true, inputType: 'text' },
+        // Nueva columna N° Prioridad (priority)
+        { id: 'priority', key: 'priority' as keyof ITRequest, label: 'Prioridad', sortable: true, editable: true, inputType: 'text' },
         { id: 'tareaSN', key: 'tareaSN' as keyof ITRequest, label: 'Tarea SN', sortable: true, editable: true, inputType: 'text' },
         { id: 'ticketRIT', key: 'ticketRIT' as keyof ITRequest, label: 'Ticket RIT', sortable: true, editable: true, inputType: 'text' },
         { id: 'fechaInicio', key: 'fechaInicio' as keyof ITRequest, label: 'Fecha Inicio', sortable: true, editable: true, inputType: 'date' },
@@ -319,7 +383,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         }
         // Default visibility (including new columns by default?)
         return new Set([
-            'id', 'title', 'domain', 'type', 'status', 'priority', 'prioridadNegocio',
+            'id', 'title', 'domain', 'type', 'status', 'urgency', 'priority',
             'tareaSN', 'ticketRIT', 'fechaInicio', 'fechaFin',
             'requester', 'direccionSolicitante', 'assigneeId', 'actions'
         ]);
@@ -435,17 +499,17 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         setSortConfig({ key, direction });
     };
 
-    const getPriorityValue = (priority: string): number => {
-        // Prioridad numérica normalizada: Menor valor = Mayor prioridad
+    const getUrgencyValue = (urgency: string): number => {
+        // Urgencia numérica normalizada: Menor valor = Mayor urgencia
         // TBD o desconocida = Valor muy alto para ir al final
         const map: Record<string, number> = {
-            [Priority.Critical]: 1,
-            [Priority.High]: 2,
-            [Priority.Medium]: 3,
-            [Priority.Low]: 4
+            [Urgency.Critical]: 1,
+            [Urgency.High]: 2,
+            [Urgency.Medium]: 3,
+            [Urgency.Low]: 4
         };
-        // Si no está en el mapa, asumimos que es "TBD" o similar (baja prioridad/final)
-        return map[priority] || 999;
+        // Si no está en el mapa, asumimos que es "TBD" o similar (baja urgencia/final)
+        return map[urgency] || 999;
     };
 
     const sortedRequests = useMemo(() => {
@@ -455,10 +519,10 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
             const aValue = a[sortConfig.key as keyof ITRequest];
             const bValue = b[sortConfig.key as keyof ITRequest];
 
-            // Custom sorting logic for N Priority (prioridadNegocio)
-            if (sortConfig.key === 'prioridadNegocio') {
-                const sA = (a.prioridadNegocio || '').toString().toUpperCase();
-                const sB = (b.prioridadNegocio || '').toString().toUpperCase();
+            // Custom sorting logic for Priority (priority)
+            if (sortConfig.key === 'priority') {
+                const sA = (a.priority || '').toString().toUpperCase();
+                const sB = (b.priority || '').toString().toUpperCase();
 
                 const isTbdA = sA === 'TBD' || sA === '';
                 const isTbdB = sB === 'TBD' || sB === '';
@@ -471,15 +535,15 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
                 if (isTbdB) return -1;
 
                 // Comparación normal para no-TBD
-                if (sA === sB) return 0;
-                const comparison = sA > sB ? 1 : -1;
+                // Use localeCompare with numeric option for natural sort order (1, 2, 10 instead of 1, 10, 2)
+                const comparison = sA.localeCompare(sB, undefined, { numeric: true, sensitivity: 'base' });
                 return sortConfig.direction === 'asc' ? comparison : -comparison;
             }
 
-            // Custom sorting logic for Priority Enum
-            if (sortConfig.key === 'priority') {
-                const pA = getPriorityValue(a.priority);
-                const pB = getPriorityValue(b.priority);
+            // Custom sorting logic for Urgency Enum
+            if (sortConfig.key === 'urgency') {
+                const pA = getUrgencyValue(a.urgency);
+                const pB = getUrgencyValue(b.urgency);
 
                 // Si ambos son TBD (999), mantener orden relativo original (stable sort effect)
                 if (pA === 999 && pB === 999) return 0;
@@ -572,10 +636,10 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
             )}
 
             <div className="flex-1 w-full overflow-auto relative">
-                <table className="min-w-full divide-y divide-gray-200">
+                <table className="min-w-full divide-y divide-gray-200 table-fixed">
                     <thead className="bg-slate-50 sticky top-0 z-10">
                         <tr>
-                            <th scope="col" className="w-10 py-3.5 pl-4 pr-3 text-left">
+                            <th scope="col" className="w-10 py-3.5 pl-4 pr-3 text-left" style={{ width: '48px' }}>
                                 <button
                                     onClick={toggleSelectAll}
                                     className="text-slate-500 hover:text-slate-700 focus:outline-none"
@@ -608,6 +672,8 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
                                             <SortableHeader
                                                 key={col.id}
                                                 id={col.id}
+                                                width={columnWidths[col.id] || 150} // Default width
+                                                onResize={(w) => handleColumnResize(col.id, w)}
                                                 onClick={() => col.sortable && handleSort(col.key)}
                                                 className={`px-3 py-3.5 text-left text-sm font-semibold text-gray-900 ${col.sortable ? 'cursor-pointer hover:bg-slate-100 transition-colors select-none group' : ''}`}
                                             >
@@ -626,7 +692,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
                                 </SortableContext>
                             </DndContext>
 
-                            <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
+                            <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6" style={{ width: '80px' }}>
                                 <span className="sr-only">Acciones</span>
                             </th>
                         </tr>
@@ -657,9 +723,10 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
                                         if (!visibleColumns.has(colId)) return null;
                                         const col = allColumns.find(c => c.id === colId);
                                         if (!col) return null;
+                                        const width = columnWidths[col.id] || 150;
 
                                         return (
-                                            <td key={col.id} className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                                            <td key={col.id} className="px-3 py-4 text-sm text-gray-500 break-words" style={{ width }}>
                                                 {renderCellContent(req, col)}
                                             </td>
                                         );

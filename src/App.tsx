@@ -6,7 +6,7 @@ import { AdminPanel } from './components/admin/AdminPanel';
 import { Reports } from './components/dashboard/Reports';
 import { BulkOperations } from './components/dashboard/BulkOperations';
 import { AuthPage } from './components/auth/AuthPage';
-import { ITRequest, ViewMode, CatalogItem, RequestType, Priority, Status } from './types';
+import { ITRequest, ViewMode, CatalogItem, RequestType, Urgency, Status } from './types';
 import { useSolicitudes } from './hooks/useSolicitudes';
 import { useDominios } from './hooks/useDominios';
 import { useCatalogos } from './hooks/useCatalogos';
@@ -27,13 +27,13 @@ function adaptarSolicitud(s: Solicitud, dominios: Dominio[]): ITRequest {
         type: s.tipo_solicitud as RequestType,
         domain: dominio?.nombre ?? s.dominio_id,
         requester: s.solicitante,
-        priority: s.prioridad as Priority,
+        urgency: s.urgencia as Urgency,
         status: s.estado as Status,
         assigneeId: s.asignado_a,
         createdAt: s.fecha_creacion,
         externalId: s.id_externo ?? undefined,
         // Campos adicionales
-        prioridadNegocio: s.prioridad_negocio ?? undefined,
+        priority: s.prioridad ?? undefined,
         tareaSN: s.tarea_sn ?? undefined,
         ticketRIT: s.ticket_rit ?? undefined,
         fechaInicio: s.fecha_inicio ?? undefined,
@@ -139,19 +139,59 @@ export default function App() {
         const dominioId = dominios.find(d => d.nombre === req.domain)?.id ?? dominios[0]?.id;
         if (!dominioId || !user) return;
 
+        // Auto-creación de elementos de catálogo inexistentes
+        const tiposCatalogoCheck: { field: keyof ITRequest, type: CatalogType }[] = [
+            { field: 'requester', type: 'usuario_solicitante' },
+            { field: 'direccionSolicitante', type: 'direccion_solicitante' },
+            { field: 'institucion', type: 'institucion' },
+            { field: 'brm', type: 'brm' },
+            { field: 'assigneeId', type: 'asignado_a' },
+            { field: 'tipoTarea', type: 'tipo_tarea' },
+            { field: 'complejidad', type: 'complejidad' },
+            // Estado y Prioridad suelen ser más estáticos, pero si se permite edición libre:
+            { field: 'status', type: 'estado' },
+            { field: 'priority', type: 'prioridad' },
+            // Wait, in types.ts I renamed Reference to 'prioridad', but did I rename catalog type in DB?
+            // The prompt didn't strictly say to rename catalog types in DB data, just column names.
+            // But types.ts says | 'prioridad' | 'urgencia'
+            // Let's assume catalog type for numeric priority is now 'prioridad' since I updated types.ts CatalogType.
+            // But wait, the existing data in DB `catalogos` table has `tipo = 'prioridad_negocio'`.
+            // I should actually migrate catalog types too if I want consistency.
+            // For now, let's look at `types.ts`. I changed `CatalogType` to include `prioridad` and `urgencia` instead of `prioridad_negocio`.
+            // So if I use `type: 'prioridad'` here, it must match DB data.
+            // I should probably ALSO update catalog types in DB.
+            // Let's assume I will update DB data for catalog types.
+        ];
+
+        for (const { field, type } of tiposCatalogoCheck) {
+            const val = req[field];
+            if (val && typeof val === 'string') {
+                // Verificar existencia insensible a mayúsculas
+                const existe = catalogos.some(c => c.tipo === type && c.valor.toLowerCase() === val.toLowerCase());
+                if (!existe) {
+                    try {
+                        await crearCatalogo(type, val);
+                        console.log(`Auto-creado item de catálogo: ${type} -> ${val}`);
+                    } catch (e) {
+                        console.error(`Error auto-creando item ${type}: ${val}`, e);
+                    }
+                }
+            }
+        }
+
         const datos = {
             titulo: req.title,
-            descripcion: req.description,
+            descripcion: req.description || '',
             tipo_solicitud: req.type as Solicitud['tipo_solicitud'],
             dominio_id: dominioId,
             solicitante: req.requester,
-            prioridad: req.priority as Solicitud['prioridad'],
+            urgencia: req.urgency as Solicitud['urgencia'],
             estado: req.status as Solicitud['estado'],
             asignado_a: req.assigneeId || null,
             fecha_vencimiento: null,
             id_externo: req.externalId || null,
             creado_por: user.id,
-            prioridad_negocio: req.prioridadNegocio || null,
+            prioridad: req.priority || null,
             tarea_sn: req.tareaSN || null,
             ticket_rit: req.ticketRIT || null,
             fecha_inicio: req.fechaInicio || null,
@@ -212,30 +252,80 @@ export default function App() {
     const handleImportRequests = async (newRequests: Partial<ITRequest>[]) => {
         if (!user) return;
 
+        // 1. Identificar y crear nuevos elementos de catálogo
+        const tiposCatalogo: { field: keyof ITRequest, type: CatalogType }[] = [
+            { field: 'requester', type: 'usuario_solicitante' },
+            { field: 'direccionSolicitante', type: 'direccion_solicitante' },
+            { field: 'institucion', type: 'institucion' },
+            { field: 'brm', type: 'brm' },
+            { field: 'assigneeId', type: 'asignado_a' },
+            { field: 'tipoTarea', type: 'tipo_tarea' },
+            { field: 'complejidad', type: 'complejidad' },
+            { field: 'priority', type: 'prioridad' },
+            { field: 'status', type: 'estado' },
+        ];
+
+        const nuevosItems: { type: CatalogType, value: string }[] = [];
+        const existingValues = new Set(catalogos.map(c => `${c.tipo}:${c.valor.toLowerCase()}`));
+
+        newRequests.forEach(req => {
+            tiposCatalogo.forEach(({ field, type }) => {
+                const val = req[field];
+                if (val && typeof val === 'string') {
+                    const key = `${type}:${val.toLowerCase()}`;
+                    if (!existingValues.has(key)) {
+                        nuevosItems.push({ type, value: val });
+                        existingValues.add(key); // Evitar duplicados en el mismo lote
+                    }
+                }
+            });
+        });
+
+        // Crear los items faltantes
+        for (const item of nuevosItems) {
+            try {
+                // Verificar doblemente si ya existe (por si acaso useCatalogos no estaba actualizado al 100% o concurrencia)
+                const yaExiste = catalogos.some(c => c.tipo === item.type && c.valor.toLowerCase() === item.value.toLowerCase());
+                if (!yaExiste) {
+                    await crearCatalogo(item.type, item.value);
+                }
+            } catch (e) {
+                console.error(`Error creando item automático ${item.type}: ${item.value}`, e);
+            }
+        }
+
+        // Helper para validar contra catálogo
+        const getValidValue = (tipo: CatalogType, valor: string | undefined, fallback: string) => {
+            if (!valor) return fallback;
+            const match = catalogos.find(c => c.tipo === tipo && c.valor.toLowerCase() === valor.toLowerCase());
+            return match ? match.valor : fallback;
+        };
+
+        // 2. Crear las solicitudes
         for (const req of newRequests) {
             await crearSolicitud({
                 titulo: req.title || 'Sin Título',
                 descripcion: req.description || '',
-                tipo_solicitud: (Object.values(RequestType).includes(req.type as RequestType) ? req.type : RequestType.NewOrder) as Solicitud['tipo_solicitud'],
+                tipo_solicitud: getValidValue('tipo_requerimiento', req.type, 'Nuevo Pedido') as Solicitud['tipo_solicitud'],
                 dominio_id: dominios.find(d => d.nombre === req.domain)?.id || dominios[0]?.id,
-                solicitante: user.email || 'Importado',
-                prioridad: (Object.values(Priority).includes(req.priority as Priority) ? req.priority : Priority.Medium) as Solicitud['prioridad'],
-                estado: Status.Pending as Solicitud['estado'],
+                solicitante: req.requester || user.email || 'Importado',
+                urgencia: getValidValue('urgencia', req.urgency, 'Media') as Solicitud['urgencia'],
+                estado: getValidValue('estado', req.status, 'Pendiente') as Solicitud['estado'],
                 creado_por: user.id,
                 tarea_sn: req.tareaSN || null,
                 ticket_rit: req.ticketRIT || null,
                 // Campos obligatorios adicionales (según tipo Solicitud)
-                asignado_a: null,
-                id_externo: null,
+                asignado_a: req.assigneeId || null,
+                id_externo: req.externalId || null,
                 fecha_vencimiento: null,
-                prioridad_negocio: null,
-                fecha_inicio: null,
-                fecha_fin: null,
-                direccion_solicitante: null,
-                brm: null,
-                institucion: null,
-                tipo_tarea: null,
-                complejidad: null
+                prioridad: req.priority || null,
+                fecha_inicio: req.fechaInicio || null,
+                fecha_fin: req.fechaFin || null,
+                direccion_solicitante: req.direccionSolicitante || null,
+                brm: req.brm || null,
+                institucion: req.institucion || null,
+                tipo_tarea: req.tipoTarea || null,
+                complejidad: req.complejidad || null
             });
         }
     };
@@ -256,11 +346,11 @@ export default function App() {
             if (domId) updateData.dominio_id = domId;
         }
         if (data.requester !== undefined) updateData.solicitante = data.requester;
-        if (data.priority !== undefined) updateData.prioridad = data.priority;
+        if (data.urgency !== undefined) updateData.urgencia = data.urgency;
         if (data.status !== undefined) updateData.estado = data.status;
         if (data.assigneeId !== undefined) updateData.asignado_a = data.assigneeId;
         if (data.externalId !== undefined) updateData.id_externo = data.externalId;
-        if (data.prioridadNegocio !== undefined) updateData.prioridad_negocio = data.prioridadNegocio;
+        if (data.priority !== undefined) updateData.prioridad = data.priority;
         if (data.tareaSN !== undefined) updateData.tarea_sn = data.tareaSN;
         if (data.ticketRIT !== undefined) updateData.ticket_rit = data.ticketRIT;
         if (data.fechaInicio !== undefined) updateData.fecha_inicio = data.fechaInicio;

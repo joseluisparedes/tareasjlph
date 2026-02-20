@@ -1,5 +1,5 @@
 import React from 'react';
-import { ITRequest, Priority, Status, RequestType } from '../../types';
+import { ITRequest, Urgency, Status, RequestType } from '../../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Download } from 'lucide-react';
 
@@ -89,7 +89,7 @@ export const Reports: React.FC<ReportsProps> = ({ requests }) => {
                 </div>
                 <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
                     <div className="text-slate-500 text-xs font-medium uppercase">Críticas Abiertas</div>
-                    <div className="text-2xl font-bold text-slate-900 mt-1">{requests.filter(r => r.priority === 'Crítica').length}</div>
+                    <div className="text-2xl font-bold text-slate-900 mt-1">{requests.filter(r => r.urgency === 'Crítica').length}</div>
                     <div className="text-xs text-slate-400 mt-2">Requiere atención inmediata</div>
                 </div>
                 <div className="bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
