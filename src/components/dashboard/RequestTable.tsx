@@ -247,6 +247,9 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         if (key === 'direccionSolicitante') {
             return catalogos?.filter(c => c.tipo === 'direccion_solicitante' && c.esta_activo).map(c => ({ value: c.valor, label: c.valor })) || [];
         }
+        if (key === 'tipoTarea') {
+            return catalogos?.filter(c => c.tipo === 'tipo_tarea' && c.esta_activo).map(c => ({ value: c.valor, label: c.valor })) || [];
+        }
         return [];
     };
 
@@ -356,6 +359,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         },
         // Nueva columna N° Prioridad (priority)
         { id: 'priority', key: 'priority' as keyof ITRequest, label: 'Prioridad', sortable: true, editable: true, inputType: 'text' },
+        { id: 'tipoTarea', key: 'tipoTarea' as keyof ITRequest, label: 'Tipo Tarea', sortable: true, editable: true, inputType: 'select' },
         { id: 'tareaSN', key: 'tareaSN' as keyof ITRequest, label: 'Tarea SN', sortable: true, editable: true, inputType: 'text' },
         { id: 'ticketRIT', key: 'ticketRIT' as keyof ITRequest, label: 'Ticket RIT', sortable: true, editable: true, inputType: 'text' },
         { id: 'fechaInicio', key: 'fechaInicio' as keyof ITRequest, label: 'Fecha Inicio', sortable: true, editable: true, inputType: 'date' },
@@ -383,7 +387,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         }
         // Default visibility (including new columns by default?)
         return new Set([
-            'id', 'title', 'domain', 'type', 'status', 'urgency', 'priority',
+            'id', 'title', 'domain', 'type', 'status', 'urgency', 'priority', 'tipoTarea',
             'tareaSN', 'ticketRIT', 'fechaInicio', 'fechaFin',
             'requester', 'direccionSolicitante', 'assigneeId', 'actions'
         ]);
