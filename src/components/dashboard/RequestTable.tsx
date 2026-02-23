@@ -5,6 +5,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import * as XLSX from 'xlsx';
+import { NotesCell } from './NotesCell';
 
 interface RequestTableProps {
     requests: ITRequest[];
@@ -25,11 +26,11 @@ const PriorityBadge: React.FC<{ priority: string; catalogos?: CatalogoItem[] }> 
     if (color) {
         return (
             <span
-                className="inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold"
+                className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium"
                 style={{
-                    backgroundColor: `${color}20`,
+                    backgroundColor: `${color}15`,
                     color: color,
-                    boxShadow: `inset 0 0 0 1px ${color}40`,
+                    border: `1px solid ${color}30`,
                 }}
             >
                 {priority}
@@ -46,11 +47,11 @@ const PriorityBadge: React.FC<{ priority: string; catalogos?: CatalogoItem[] }> 
     const fallback = fallbackMap[priority] || '#94a3b8';
     return (
         <span
-            className="inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold"
+            className="inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium"
             style={{
-                backgroundColor: `${fallback}20`,
+                backgroundColor: `${fallback}15`,
                 color: fallback,
-                boxShadow: `inset 0 0 0 1px ${fallback}40`,
+                border: `1px solid ${fallback}30`,
             }}
         >
             {priority}
@@ -126,11 +127,11 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({ id, children, onClick, 
 
     return (
         <th ref={setNodeRef} style={style} className={`${className} whitespace-nowrap group/th relative`} scope="col">
-            <div className="flex items-center gap-1 group/header w-full overflow-hidden">
+            <div className={`flex items-center gap-1 group/header w-full overflow-hidden ${className?.includes('text-center') ? 'justify-center' : ''}`}>
                 <button {...attributes} {...listeners} className="cursor-grab text-slate-300 hover:text-slate-500 opacity-0 group-hover/header:opacity-100 transition-opacity p-0.5 rounded hover:bg-slate-200 shrink-0">
                     <GripVertical size={14} />
                 </button>
-                <div onClick={onClick} className="flex-1 flex items-center gap-1 cursor-pointer select-none overflow-hidden text-ellipsis">
+                <div onClick={onClick} className={`flex-1 flex items-center gap-1 cursor-pointer select-none overflow-hidden text-ellipsis ${className?.includes('text-center') ? 'justify-center' : ''}`}>
                     {children}
                 </div>
             </div>
@@ -309,7 +310,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         // Standard Render
         return (
             <div
-                className={`w-full h-full min-h-[24px] flex items-center ${col.editable ? 'cursor-text hover:bg-slate-50 px-1 -mx-1 rounded border border-transparent hover:border-slate-200' : ''}`}
+                className={`w-full h-full min-h-[24px] flex items-center ${col.id === 'title' ? '' : 'justify-center'} ${col.editable ? 'cursor-text hover:bg-slate-50 px-1 -mx-1 rounded border border-transparent hover:border-slate-200' : ''}`}
                 onClick={(e) => {
                     if (col.editable && onUpdateRequest) {
                         e.stopPropagation();
@@ -330,12 +331,16 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
     const allColumns: (ColumnConfig & { id: string })[] = [
         { id: 'id', key: 'id' as keyof ITRequest, label: 'ID', sortable: true, editable: false },
         {
+            id: 'apuntes', key: 'id' as keyof ITRequest, label: 'Apuntes y Actualizaciones', sortable: false, editable: false,
+            render: (req) => <NotesCell requestId={req.id} />
+        },
+        {
             id: 'title', key: 'title', label: 'Título', sortable: true, editable: true, inputType: 'text',
             render: (req) => (
                 editingCell?.id === req.id && editingCell.field === 'title' ? null : // Don't render custom if editing
                     <div className="flex flex-col w-full">
-                        <span className="font-medium text-gray-900 break-words">{req.title}</span>
-                        {req.externalId && <span className="text-[10px] text-indigo-500 truncate">🔗 {req.externalId}</span>}
+                        <span className="font-medium text-slate-800 break-words leading-snug">{req.title}</span>
+                        {req.externalId && <span className="text-[11px] text-indigo-500/80 truncate mt-0.5">🔗 {req.externalId}</span>}
                     </div>
             )
         },
@@ -344,10 +349,10 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         {
             id: 'status', key: 'status', label: 'Estado', sortable: true, editable: true, inputType: 'select',
             render: (req) => (
-                <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${req.status === 'En ejecución' ? 'bg-blue-50 text-blue-700 ring-blue-700/10' :
-                    req.status === 'Pendiente' ? 'bg-yellow-50 text-yellow-800 ring-yellow-600/20' :
-                        req.status === 'Cerrado' ? 'bg-green-50 text-green-700 ring-green-600/20' :
-                            'bg-gray-50 text-gray-600 ring-gray-500/10'
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border ${req.status === 'En ejecución' ? 'bg-blue-50/50 text-blue-700 border-blue-200' :
+                    req.status === 'Pendiente' ? 'bg-amber-50/50 text-amber-700 border-amber-200' :
+                        req.status === 'Cerrado' ? 'bg-emerald-50/50 text-emerald-700 border-emerald-200' :
+                            'bg-slate-50 text-slate-600 border-slate-200'
                     }`}>
                     {req.status}
                 </span>
@@ -368,7 +373,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         { id: 'direccionSolicitante', key: 'direccionSolicitante', label: 'Dirección de Solicitante', sortable: true, editable: true, inputType: 'select' },
         {
             id: 'assigneeId', key: 'assigneeId', label: 'Asignado', sortable: true, editable: false, // Could be select if we had users list
-            render: (req) => req.assigneeId ? <span className="text-xs text-slate-700">{req.assigneeId}</span> : <span className="text-gray-400 italic">Sin asignar</span>
+            render: (req) => req.assigneeId ? <span className="text-slate-700">{req.assigneeId}</span> : <span className="text-slate-400 italic">Sin asignar</span>
         },
     ];
 
@@ -387,7 +392,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         }
         // Default visibility (including new columns by default?)
         return new Set([
-            'id', 'title', 'domain', 'type', 'status', 'urgency', 'priority', 'tipoTarea',
+            'id', 'title', 'apuntes', 'domain', 'type', 'status', 'urgency', 'priority', 'tipoTarea',
             'tareaSN', 'ticketRIT', 'fechaInicio', 'fechaFin',
             'requester', 'direccionSolicitante', 'assigneeId', 'actions'
         ]);
@@ -679,7 +684,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
                                                 width={columnWidths[col.id] || 150} // Default width
                                                 onResize={(w) => handleColumnResize(col.id, w)}
                                                 onClick={() => col.sortable && handleSort(col.key)}
-                                                className={`px-3 py-3.5 text-left text-sm font-semibold text-gray-900 ${col.sortable ? 'cursor-pointer hover:bg-slate-100 transition-colors select-none group' : ''}`}
+                                                className={`px-3 py-3.5 text-xs font-bold text-slate-700 uppercase tracking-wider ${col.sortable ? 'cursor-pointer hover:bg-slate-100 transition-colors select-none group' : ''} ${col.id === 'title' ? 'text-left' : 'text-center'}`}
                                             >
                                                 {col.label}
                                                 {col.sortable && sortConfig.key === col.key && (
@@ -730,7 +735,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
                                         const width = columnWidths[col.id] || 150;
 
                                         return (
-                                            <td key={col.id} className="px-3 py-4 text-sm text-gray-500 break-words" style={{ width }}>
+                                            <td key={col.id} className={`px-3 py-3 text-sm text-slate-600 break-words align-middle ${col.id === 'title' ? 'text-left' : 'text-center'}`} style={{ width }}>
                                                 {renderCellContent(req, col)}
                                             </td>
                                         );
