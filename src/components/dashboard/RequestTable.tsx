@@ -327,6 +327,13 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
 
 
     // ... inside RequestTable ...
+    const formatDate = (ds: string | undefined | null) => {
+        if (!ds) return <span className="text-gray-300 italic text-xs">Vacío</span>;
+        const parts = ds.split('T')[0].split('-');
+        if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        return ds;
+    };
+
     // Definición de todas las columnas posibles
     const allColumns: (ColumnConfig & { id: string })[] = [
         { id: 'id', key: 'id' as keyof ITRequest, label: 'ID', sortable: true, editable: false },
@@ -367,8 +374,14 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         { id: 'tipoTarea', key: 'tipoTarea' as keyof ITRequest, label: 'Tipo Tarea', sortable: true, editable: true, inputType: 'select' },
         { id: 'tareaSN', key: 'tareaSN' as keyof ITRequest, label: 'Tarea SN', sortable: true, editable: true, inputType: 'text' },
         { id: 'ticketRIT', key: 'ticketRIT' as keyof ITRequest, label: 'Ticket RIT', sortable: true, editable: true, inputType: 'text' },
-        { id: 'fechaInicio', key: 'fechaInicio' as keyof ITRequest, label: 'Fecha Inicio', sortable: true, editable: true, inputType: 'date' },
-        { id: 'fechaFin', key: 'fechaFin' as keyof ITRequest, label: 'Fecha Fin', sortable: true, editable: true, inputType: 'date' },
+        {
+            id: 'fechaInicio', key: 'fechaInicio' as keyof ITRequest, label: 'Fecha Inicio', sortable: true, editable: true, inputType: 'date',
+            render: (req) => formatDate(req.fechaInicio as string | undefined)
+        },
+        {
+            id: 'fechaFin', key: 'fechaFin' as keyof ITRequest, label: 'Fecha Fin', sortable: true, editable: true, inputType: 'date',
+            render: (req) => formatDate(req.fechaFin as string | undefined)
+        },
         { id: 'requester', key: 'requester', label: 'Solicitante', sortable: true, editable: true, inputType: 'select' },
         { id: 'direccionSolicitante', key: 'direccionSolicitante', label: 'Dirección de Solicitante', sortable: true, editable: true, inputType: 'select' },
         {

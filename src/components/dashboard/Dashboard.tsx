@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { ITRequest, DashboardView, FilterState, RequestType, Urgency, Status, CatalogItem, CatalogoItem } from '../../types';
 import { KanbanBoard } from './KanbanBoard';
 import { RequestTable } from './RequestTable';
 import { LayoutGrid, List, Search, Filter, Plus, DownloadCloud, Save, Trash2, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase/cliente';
+import { MultiSelectDropdown } from '../shared/MultiSelectDropdown';
 
 interface DashboardProps {
     requests: ITRequest[];
@@ -67,14 +68,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
         });
     };
 
-    // Helper para obtener opciones únicas de catálogos
-    const uniqueDirections = useMemo(() =>
-        Array.from(new Set(catalogos.filter(c => c.tipo === 'direccion_solicitante' && c.esta_activo).map(c => c.valor))),
-        [catalogos]);
+    const handleFilterArrayChange = (key: keyof FilterState, values: string[]) => {
+        setFilters(prev => ({ ...prev, [key]: values }));
+    };
 
-    const uniqueRequesters = useMemo(() =>
-        Array.from(new Set(catalogos.filter(c => c.tipo === 'usuario_solicitante' && c.esta_activo).map(c => c.valor))),
-        [catalogos]);
+    // Calculate available options for cascading filters
+    const availableOptions = useMemo(() => {
+        const getOptions = (keyToIgnore: keyof FilterState) => {
+            return requests.filter(req => {
+                if (filters.search) {
+                    const term = filters.search.toLowerCase();
+                    const matches = Object.values(req).some(val => val !== null && val !== undefined && String(val).toLowerCase().includes(term));
+                    if (!matches) return false;
+                }
+                if (keyToIgnore !== 'domain' && filters.domain.length > 0 && !filters.domain.includes(req.domain)) return false;
+                if (keyToIgnore !== 'type' && filters.type.length > 0 && !filters.type.includes(req.type)) return false;
+                if (keyToIgnore !== 'urgency' && filters.urgency.length > 0 && !filters.urgency.includes(req.urgency)) return false;
+                if (keyToIgnore !== 'status' && filters.status.length > 0 && !filters.status.includes(req.status)) return false;
+                if (keyToIgnore !== 'direction' && filters.direction.length > 0 && (!req.direccionSolicitante || !filters.direction.includes(req.direccionSolicitante))) return false;
+                if (keyToIgnore !== 'requester' && filters.requester.length > 0 && (!req.requester || !filters.requester.includes(req.requester))) return false;
+                return true;
+            });
+        };
+
+        const sortAndFilter = (arr: any[]) => Array.from(new Set(arr.filter(Boolean))).sort() as string[];
+
+        return {
+            domain: sortAndFilter(getOptions('domain').map(r => r.domain)),
+            type: sortAndFilter(getOptions('type').map(r => r.type)),
+            urgency: sortAndFilter(getOptions('urgency').map(r => r.urgency)),
+            status: sortAndFilter(getOptions('status').map(r => r.status)),
+            direction: sortAndFilter(getOptions('direction').map(r => r.direccionSolicitante)),
+            requester: sortAndFilter(getOptions('requester').map(r => r.requester)),
+        };
+    }, [requests, filters]);
 
 
 
@@ -83,6 +110,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
     const [isFilterMenuOpen, setIsFilterMenuOpen] = useState(false);
     const [newFilterName, setNewFilterName] = useState('');
     const [showSaveInput, setShowSaveInput] = useState(false);
+    const filterMenuRef = useRef<HTMLDivElement>(null);
+
+    // Close "Mis Filtros" on click outside
+    React.useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (filterMenuRef.current && !filterMenuRef.current.contains(event.target as Node)) {
+                setIsFilterMenuOpen(false);
+                setShowSaveInput(false);
+            }
+        };
+
+        if (isFilterMenuOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isFilterMenuOpen]);
 
     // Cargar filtros al inicio
     React.useEffect(() => {
@@ -138,20 +181,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
             {/* Action Bar */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-2">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <div className="relative flex items-center">
+                        <Search className="absolute left-3 text-slate-400" size={18} />
                         <input
                             type="text"
                             placeholder="Buscar solicitudes..."
-                            className="pl-10 pr-4 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none w-64 bg-white text-gray-900"
+                            className="pl-10 pr-10 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none w-64 bg-white text-gray-900"
                             value={filters.search}
                             onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                         />
+                        {filters.search && (
+                            <button
+                                onClick={() => setFilters(prev => ({ ...prev, search: '' }))}
+                                className="absolute right-3 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                            >
+                                <X size={16} />
+                            </button>
+                        )}
                     </div>
                     <div className="h-8 w-px bg-slate-200 mx-2"></div>
 
                     {/* Filtros Guardados */}
-                    <div className="relative">
+                    <div className="relative" ref={filterMenuRef}>
                         <button
                             onClick={() => setIsFilterMenuOpen(!isFilterMenuOpen)}
                             className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors"
@@ -252,62 +303,59 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     <Filter size={16} /> Filtros:
                 </span>
 
-                <select
-                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white max-w-[150px]"
-                    onChange={(e) => e.target.value && handleFilterChange('domain', e.target.value)}
-                    value=""
-                >
-                    <option value="">Dominio</option>
-                    {domains.filter(d => d.isActive).map(d => (
-                        <option key={d.id} value={d.name}>{d.name}</option>
-                    ))}
-                </select>
+                <MultiSelectDropdown
+                    label="Dominio"
+                    options={availableOptions.domain}
+                    selected={filters.domain}
+                    onChange={(vals) => handleFilterArrayChange('domain', vals)}
+                    placeholder="Todos"
+                    className="w-[150px]"
+                />
 
-                <select
-                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white max-w-[150px]"
-                    onChange={(e) => e.target.value && handleFilterChange('type', e.target.value)}
-                    value=""
-                >
-                    <option value="">Tipo</option>
-                    {Array.from(new Set(catalogos.filter(c => c.tipo === 'tipo_requerimiento' && c.esta_activo).map(c => c.valor))).sort().map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <MultiSelectDropdown
+                    label="Tipo"
+                    options={availableOptions.type}
+                    selected={filters.type}
+                    onChange={(vals) => handleFilterArrayChange('type', vals)}
+                    placeholder="Todos"
+                    className="w-[150px]"
+                />
 
-                <select
-                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white max-w-[150px]"
-                    onChange={(e) => e.target.value && handleFilterChange('urgency', e.target.value)}
-                    value=""
-                >
-                    <option value="">Urgencia</option>
-                    {Array.from(new Set(catalogos.filter(c => c.tipo === 'urgencia' && c.esta_activo).map(c => c.valor))).sort().map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
+                <MultiSelectDropdown
+                    label="Urgencia"
+                    options={availableOptions.urgency}
+                    selected={filters.urgency}
+                    onChange={(vals) => handleFilterArrayChange('urgency', vals)}
+                    placeholder="Todas"
+                    className="w-[150px]"
+                />
 
-                {/* Nuevos Filtros */}
-                <select
-                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white max-w-[150px]"
-                    onChange={(e) => e.target.value && handleFilterChange('status', e.target.value)}
-                    value=""
-                >
-                    <option value="">Estado</option>
-                    {Array.from(new Set(catalogos.filter(c => c.tipo === 'estado' && c.esta_activo).map(c => c.valor))).sort().map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <MultiSelectDropdown
+                    label="Estado"
+                    options={availableOptions.status}
+                    selected={filters.status}
+                    onChange={(vals) => handleFilterArrayChange('status', vals)}
+                    placeholder="Todos"
+                    className="w-[150px]"
+                />
 
-                <select
-                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white max-w-[150px]"
-                    onChange={(e) => e.target.value && handleFilterChange('direction', e.target.value)}
-                    value=""
-                >
-                    <option value="">Dirección</option>
-                    {uniqueDirections.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
+                <MultiSelectDropdown
+                    label="Dirección"
+                    options={availableOptions.direction}
+                    selected={filters.direction}
+                    onChange={(vals) => handleFilterArrayChange('direction', vals)}
+                    placeholder="Todas"
+                    className="w-[150px]"
+                />
 
-                <select
-                    className="border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white max-w-[150px]"
-                    onChange={(e) => e.target.value && handleFilterChange('requester', e.target.value)}
-                    value=""
-                >
-                    <option value="">Solicitante</option>
-                    {uniqueRequesters.map(r => <option key={r} value={r}>{r}</option>)}
-                </select>
+                <MultiSelectDropdown
+                    label="Solicitante"
+                    options={availableOptions.requester}
+                    selected={filters.requester}
+                    onChange={(vals) => handleFilterArrayChange('requester', vals)}
+                    placeholder="Todos"
+                    className="w-[150px]"
+                />
 
 
 

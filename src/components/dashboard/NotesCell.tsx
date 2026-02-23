@@ -147,8 +147,23 @@ export const NotesCell: React.FC<NotesCellProps> = ({ requestId }) => {
                     )}
                 </div>
 
-                <div className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-slate-600">
-                    {ultimoApunte ? ultimoApunte.nota : <span className="text-slate-400 italic">Escribir apunte...</span>}
+                <div className="flex-1 min-w-0 text-xs text-slate-600">
+                    {ultimoApunte ? (
+                        <div className="flex items-center justify-center gap-1 flex-wrap">
+                            <span className="break-words text-center">
+                                {ultimoApunte.nota.length > 30
+                                    ? `${ultimoApunte.nota.substring(0, 30)}... `
+                                    : ultimoApunte.nota}
+                            </span>
+                            {ultimoApunte.nota.length > 30 && (
+                                <span className="text-blue-600 hover:text-blue-800 hover:underline font-semibold shrink-0">
+                                    ver más
+                                </span>
+                            )}
+                        </div>
+                    ) : (
+                        <span className="text-slate-400 italic text-center block w-full">Escribir apunte...</span>
+                    )}
                 </div>
             </div>
 

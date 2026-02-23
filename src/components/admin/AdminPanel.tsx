@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CatalogItem, CatalogoItem, CatalogType, User, ITRequest } from '../../types';
 import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, Edit2, Save, X, Plus, Tag, LayoutGrid, List } from 'lucide-react';
+import { useUsuarios } from '../../hooks/useUsuarios';
 
 interface AdminPanelProps {
     domains: CatalogItem[];
@@ -188,11 +189,32 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     catalogos, onAddCatalogo, onUpdateCatalogo, onDeleteCatalogo,
     getModo, setModo, requests
 }) => {
+    const { usuarios, cargando: cargandoUsuarios, actualizarUsuario, eliminarUsuario } = useUsuarios();
     const [activeTab, setActiveTab] = useState<AdminTab>('domains');
     const [isAddingDomain, setIsAddingDomain] = useState(false);
     const [newDomainName, setNewDomainName] = useState('');
     const [editingDomainId, setEditingDomainId] = useState<string | null>(null);
     const [editName, setEditName] = useState('');
+
+    const [editingUserId, setEditingUserId] = useState<string | null>(null);
+    const [editUserName, setEditUserName] = useState('');
+    const [editUserRole, setEditUserRole] = useState('');
+
+    const handleSaveUser = async (id: string) => {
+        if (editUserName.trim() && editUserRole.trim()) {
+            await actualizarUsuario(id, { nombre_completo: editUserName.trim(), rol: editUserRole });
+            setEditingUserId(null);
+        }
+    };
+
+    const handleDeleteUser = async (id: string, name: string) => {
+        if (confirm(`Alerta: Eliminar a un usuario podría afectar registros históricos si el usuario ha creado o tiene solicitudes asignadas.\n\n¿Estás seguro que deseas intentar eliminar permanentemente a "${name}"?`)) {
+            const { error } = await eliminarUsuario(id);
+            if (error) {
+                alert(`No se pudo eliminar al usuario. Es posible que tenga solicitudes asociadas.\nDetalles: ${error.message}`);
+            }
+        }
+    };
 
     const handleToggleDomain = (domain: CatalogItem) => {
         if (confirm(`¿${domain.isActive ? 'Desactivar' : 'Activar'} el dominio "${domain.name}"?`)) {
@@ -341,7 +363,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     <UserPlus size={15} /> Invitar Usuario
                                 </button>
                             </div>
-                            {initialUsers.length === 0 ? (
+                            {cargandoUsuarios ? (
+                                <div className="text-center py-16 text-slate-400">
+                                    <p className="font-medium animate-pulse">Cargando usuarios...</p>
+                                </div>
+                            ) : usuarios.length === 0 ? (
                                 <div className="text-center py-16 text-slate-400">
                                     <p className="font-medium">No hay usuarios registrados aún.</p>
                                     <p className="text-sm mt-1">Los usuarios aparecerán aquí cuando se registren en el sistema.</p>
@@ -357,19 +383,66 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                             </tr>
                                         </thead>
                                         <tbody className="bg-white divide-y divide-slate-100">
-                                            {initialUsers.map(user => (
+                                            {usuarios.map(user => (
                                                 <tr key={user.id} className="hover:bg-slate-50">
                                                     <td className="px-6 py-4">
-                                                        <div className="text-sm font-medium text-slate-900">{user.name}</div>
-                                                        <div className="text-xs text-slate-500">{user.email}</div>
+                                                        {editingUserId === user.id ? (
+                                                            <div className="flex flex-col gap-1">
+                                                                <input
+                                                                    autoFocus
+                                                                    type="text"
+                                                                    className="border border-slate-300 rounded px-2 py-1 text-sm bg-white focus:ring-1 focus:ring-blue-500 outline-none w-full max-w-[200px]"
+                                                                    value={editUserName}
+                                                                    onChange={e => setEditUserName(e.target.value)}
+                                                                    onKeyDown={e => { if (e.key === 'Enter') handleSaveUser(user.id); if (e.key === 'Escape') setEditingUserId(null); }}
+                                                                />
+                                                                <div className="text-xs text-slate-500">{user.correo_electronico}</div>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <div className="text-sm font-medium text-slate-900">{user.nombre_completo}</div>
+                                                                <div className="text-xs text-slate-500">{user.correo_electronico}</div>
+                                                            </>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-4">
-                                                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${user.role === 'Administrador' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                            {user.role}
-                                                        </span>
+                                                        {editingUserId === user.id ? (
+                                                            <select
+                                                                className="border border-slate-300 rounded px-2 py-1 text-sm bg-white focus:ring-1 focus:ring-blue-500 outline-none"
+                                                                value={editUserRole}
+                                                                onChange={e => setEditUserRole(e.target.value)}
+                                                            >
+                                                                <option value="Colaborador">Colaborador</option>
+                                                                <option value="Administrador">Administrador</option>
+                                                            </select>
+                                                        ) : (
+                                                            <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${user.rol === 'Administrador' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                                {user.rol}
+                                                            </span>
+                                                        )}
                                                     </td>
                                                     <td className="px-6 py-4 text-right">
-                                                        <button className="text-sm text-blue-600 hover:text-blue-800 font-medium">Editar</button>
+                                                        {editingUserId === user.id ? (
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                <button onClick={() => handleSaveUser(user.id)} className="p-1.5 text-green-600 hover:bg-green-50 rounded" title="Guardar"><Save size={16} /></button>
+                                                                <button onClick={() => setEditingUserId(null)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="Cancelar"><X size={16} /></button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                <button
+                                                                    onClick={() => { setEditingUserId(user.id); setEditUserName(user.nombre_completo); setEditUserRole(user.rol); }}
+                                                                    className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded" title="Editar"
+                                                                >
+                                                                    <Edit2 size={16} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteUser(user.id, user.nombre_completo)}
+                                                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded" title="Eliminar"
+                                                                >
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </div>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))}
