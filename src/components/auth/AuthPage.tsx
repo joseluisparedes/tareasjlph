@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
+import { useAppSettings } from '../../hooks/useAppSettings';
 import { LogIn, UserPlus, Eye, EyeOff, Loader2, ShieldCheck } from 'lucide-react';
 
 type AuthMode = 'login' | 'register';
 
 export function AuthPage() {
     const { iniciarSesion, registrarse } = useAuth();
+    const { permitirRegistro } = useAppSettings();
     const [mode, setMode] = useState<AuthMode>('login');
     const [correo, setCorreo] = useState('');
     const [contrasena, setContrasena] = useState('');
@@ -61,28 +63,30 @@ export function AuthPage() {
                 {/* Card */}
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-8 shadow-2xl">
                     {/* Tab switcher */}
-                    <div className="flex bg-white/5 rounded-xl p-1 mb-6">
-                        <button
-                            onClick={() => { setMode('login'); setError(null); setMensaje(null); }}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${mode === 'login'
+                    {permitirRegistro !== false && (
+                        <div className="flex bg-white/5 rounded-xl p-1 mb-6">
+                            <button
+                                onClick={() => { setMode('login'); setError(null); setMensaje(null); }}
+                                className={`flex flex-1 items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${mode === 'login'
                                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                                     : 'text-slate-400 hover:text-white'
-                                }`}
-                        >
-                            <LogIn size={16} />
-                            Iniciar Sesión
-                        </button>
-                        <button
-                            onClick={() => { setMode('register'); setError(null); setMensaje(null); }}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${mode === 'register'
+                                    }`}
+                            >
+                                <LogIn size={16} />
+                                Iniciar Sesión
+                            </button>
+                            <button
+                                onClick={() => { setMode('register'); setError(null); setMensaje(null); }}
+                                className={`flex flex-1 items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${mode === 'register'
                                     ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30'
                                     : 'text-slate-400 hover:text-white'
-                                }`}
-                        >
-                            <UserPlus size={16} />
-                            Crear Cuenta
-                        </button>
-                    </div>
+                                    }`}
+                            >
+                                <UserPlus size={16} />
+                                Crear Cuenta
+                            </button>
+                        </div>
+                    )}
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         {/* Nombre (solo registro) */}

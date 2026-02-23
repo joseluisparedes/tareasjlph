@@ -1,13 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { catalogosApi } from '../lib/api/catalogos';
 import type { CatalogoItem, CatalogType } from '../types';
+import { useAuth } from './useAuth';
 
 export function useCatalogos() {
+    const { user } = useAuth();
     const [catalogos, setCatalogos] = useState<CatalogoItem[]>([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const cargar = useCallback(async () => {
+        if (!user) {
+            setCatalogos([]);
+            setCargando(false);
+            return;
+        }
         try {
             setCargando(true);
             setError(null);
@@ -18,7 +25,7 @@ export function useCatalogos() {
         } finally {
             setCargando(false);
         }
-    }, []);
+    }, [user]);
 
     useEffect(() => { cargar(); }, [cargar]);
 

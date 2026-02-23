@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ITRequest, RequestType, Urgency, Status, CatalogItem, CatalogoItem, CatalogType } from '../../types';
 import type { SolicitudFecha, SolicitudApunte } from '../../lib/supabase/tipos-bd';
 import { apuntesApi } from '../../lib/api/apuntes';
+import { useAuth } from '../../hooks/useAuth';
 import { X, Save, Calendar, Hash, FileText, History, User, Grid } from 'lucide-react';
 
 interface RequestModalProps {
@@ -24,6 +25,8 @@ const labelClass = "block text-xs font-semibold text-slate-600 uppercase trackin
 export const RequestModal: React.FC<RequestModalProps> = ({
     isOpen, onClose, request, onSave, onDelete, domains, catalogos, historialFechas = [], getModo
 }) => {
+    const { perfil } = useAuth();
+
     // Filtrar catálogos activos
     const getCats = (tipo: CatalogType) => catalogos.filter(c => c.tipo === tipo && c.esta_activo);
 
@@ -74,8 +77,8 @@ export const RequestModal: React.FC<RequestModalProps> = ({
         if (!nuevoApunte.trim() || !request?.id) return;
         setGuardandoApunte(true);
         try {
-            // TODO: Obtener usuario real si hay auth
-            const apunte = await apuntesApi.crear(request.id, nuevoApunte, 'Usuario Actual');
+            const userName = perfil?.nombre_completo || 'Usuario Desconocido';
+            const apunte = await apuntesApi.crear(request.id, nuevoApunte, userName);
             setApuntes(prev => [apunte, ...prev]);
             setNuevoApunte('');
         } catch (error) {

@@ -1,13 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { dominiosApi } from '../lib/api/dominios';
 import type { Dominio } from '../lib/supabase/tipos-bd';
+import { useAuth } from './useAuth';
 
 export function useDominios() {
+    const { user } = useAuth();
     const [dominios, setDominios] = useState<Dominio[]>([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const cargar = useCallback(async () => {
+        if (!user) {
+            setDominios([]);
+            setCargando(false);
+            return;
+        }
         try {
             setCargando(true);
             setError(null);
@@ -18,7 +25,7 @@ export function useDominios() {
         } finally {
             setCargando(false);
         }
-    }, []);
+    }, [user]);
 
     useEffect(() => {
         cargar();

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase/cliente';
+import { useAuth } from './useAuth';
 
 export interface UsuarioDB {
     id: string;
@@ -9,14 +10,20 @@ export interface UsuarioDB {
 }
 
 export function useUsuarios() {
+    const { user } = useAuth();
     const [usuarios, setUsuarios] = useState<UsuarioDB[]>([]);
     const [cargando, setCargando] = useState(true);
 
     useEffect(() => {
         cargarUsuarios();
-    }, []);
+    }, [user]);
 
     const cargarUsuarios = async () => {
+        if (!user) {
+            setUsuarios([]);
+            setCargando(false);
+            return;
+        }
         setCargando(true);
         const { data, error } = await supabase
             .from('usuarios')

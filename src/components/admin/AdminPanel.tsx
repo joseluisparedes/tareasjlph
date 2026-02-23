@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { CatalogItem, CatalogoItem, CatalogType, User, ITRequest } from '../../types';
-import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, Edit2, Save, X, Plus, Tag, LayoutGrid, List } from 'lucide-react';
+import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, Edit2, Save, X, Plus, Tag, LayoutGrid, List, Power } from 'lucide-react';
 import { useUsuarios } from '../../hooks/useUsuarios';
+import { useAppSettings } from '../../hooks/useAppSettings';
 
 interface AdminPanelProps {
     domains: CatalogItem[];
@@ -190,6 +191,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     getModo, setModo, requests
 }) => {
     const { usuarios, cargando: cargandoUsuarios, actualizarUsuario, eliminarUsuario } = useUsuarios();
+    const { permitirRegistro, actualizarPermisoRegistro, cargando: cargandoSettings } = useAppSettings();
     const [activeTab, setActiveTab] = useState<AdminTab>('domains');
     const [isAddingDomain, setIsAddingDomain] = useState(false);
     const [newDomainName, setNewDomainName] = useState('');
@@ -357,6 +359,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     {/* ── TAB: Usuarios ── */}
                     {activeTab === 'users' && (
                         <div>
+                            {/* Panel de Configuración de Acceso */}
+                            <div className="mb-6 p-5 bg-white border border-slate-200 rounded-xl flex items-center justify-between shadow-sm">
+                                <div>
+                                    <h4 className="font-semibold text-slate-800 flex items-center gap-2">
+                                        <Shield size={18} className="text-violet-600" />
+                                        Control de Registro Público
+                                    </h4>
+                                    <p className="text-sm text-slate-500 mt-1 max-w-xl">
+                                        Si está desactivado, se ocultará el formulario de "Crear Cuenta" en la pantalla de inicio de sesión.
+                                        Los nuevos usuarios no podrán auto-registrarse.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className={`text-sm font-medium ${permitirRegistro ? 'text-green-600' : 'text-slate-500'}`}>
+                                        {cargandoSettings ? 'Cargando...' : permitirRegistro ? 'Habilitado' : 'Deshabilitado'}
+                                    </span>
+                                    <button
+                                        disabled={cargandoSettings}
+                                        onClick={() => actualizarPermisoRegistro(!permitirRegistro)}
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${permitirRegistro ? 'bg-green-500' : 'bg-slate-300'
+                                            }`}
+                                    >
+                                        <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${permitirRegistro ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
                             <div className="flex justify-between items-center mb-4">
                                 <h3 className="font-semibold text-lg text-slate-800">Miembros del Equipo</h3>
                                 <button className="flex items-center gap-2 text-sm bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700">

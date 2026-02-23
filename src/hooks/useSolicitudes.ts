@@ -1,13 +1,20 @@
 import { useState, useEffect, useCallback } from 'react';
 import { solicitudesApi } from '../lib/api/solicitudes';
 import type { Solicitud } from '../lib/supabase/tipos-bd';
+import { useAuth } from './useAuth';
 
 export function useSolicitudes() {
+    const { user } = useAuth();
     const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const cargar = useCallback(async () => {
+        if (!user) {
+            setSolicitudes([]);
+            setCargando(false);
+            return;
+        }
         try {
             setCargando(true);
             setError(null);
@@ -18,7 +25,7 @@ export function useSolicitudes() {
         } finally {
             setCargando(false);
         }
-    }, []);
+    }, [user]);
 
     useEffect(() => {
         cargar();

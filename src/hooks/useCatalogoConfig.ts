@@ -1,18 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import { catalogoConfigApi } from '../lib/api/catalogoConfig';
 import type { CatalogoConfig, CatalogType } from '../types';
+import { useAuth } from './useAuth';
 
 export function useCatalogoConfig() {
+    const { user } = useAuth();
     const [configs, setConfigs] = useState<CatalogoConfig[]>([]);
 
     const cargar = useCallback(async () => {
+        if (!user) {
+            setConfigs([]);
+            return;
+        }
         try {
             const datos = await catalogoConfigApi.obtenerTodos();
             setConfigs(datos);
         } catch {
             setConfigs([]);
         }
-    }, []);
+    }, [user]);
 
     useEffect(() => { cargar(); }, [cargar]);
 
