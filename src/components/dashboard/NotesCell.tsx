@@ -25,6 +25,15 @@ export const NotesCell: React.FC<NotesCellProps> = ({ requestId }) => {
 
     useEffect(() => {
         cargarApuntes();
+
+        const handleApuntesUpdate = (e: CustomEvent) => {
+            if (e.detail?.requestId === requestId && e.detail?.source !== 'NotesCell') {
+                cargarApuntes();
+            }
+        };
+
+        window.addEventListener('apuntes-actualizados', handleApuntesUpdate as EventListener);
+        return () => window.removeEventListener('apuntes-actualizados', handleApuntesUpdate as EventListener);
     }, [requestId]);
 
     useEffect(() => {
@@ -86,6 +95,7 @@ export const NotesCell: React.FC<NotesCellProps> = ({ requestId }) => {
             const apunte = await apuntesApi.crear(requestId, nuevoApunte, 'Usuario Actual');
             setApuntes(prev => [apunte, ...prev]);
             setNuevoApunte('');
+            window.dispatchEvent(new CustomEvent('apuntes-actualizados', { detail: { requestId, source: 'NotesCell' } }));
         } catch (error) {
             console.error("Error al guardar apunte:", error);
             alert("No se pudo guardar el apunte.");
@@ -99,6 +109,7 @@ export const NotesCell: React.FC<NotesCellProps> = ({ requestId }) => {
         try {
             await apuntesApi.eliminar(id);
             setApuntes(prev => prev.filter(a => a.id !== id));
+            window.dispatchEvent(new CustomEvent('apuntes-actualizados', { detail: { requestId, source: 'NotesCell' } }));
         } catch (error) {
             console.error("Error al eliminar apunte:", error);
             alert("No se pudo eliminar el apunte.");
@@ -117,6 +128,7 @@ export const NotesCell: React.FC<NotesCellProps> = ({ requestId }) => {
             setApuntes(prev => prev.map(a => a.id === editingApunteId ? actualizado : a));
             setEditingApunteId(null);
             setEditNota('');
+            window.dispatchEvent(new CustomEvent('apuntes-actualizados', { detail: { requestId, source: 'NotesCell' } }));
         } catch (error) {
             console.error("Error al actualizar apunte:", error);
             alert("No se pudo actualizar el apunte.");

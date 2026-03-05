@@ -73,6 +73,19 @@ export const RequestModal: React.FC<RequestModalProps> = ({
         }
     }, [request, isOpen]);
 
+    useEffect(() => {
+        if (!isOpen || !request?.id) return;
+        const handleApuntesUpdate = (e: CustomEvent) => {
+            if (e.detail?.requestId === request.id && e.detail?.source !== 'RequestModal') {
+                apuntesApi.obtenerPorSolicitud(request.id)
+                    .then(setApuntes)
+                    .catch(console.error);
+            }
+        };
+        window.addEventListener('apuntes-actualizados', handleApuntesUpdate as EventListener);
+        return () => window.removeEventListener('apuntes-actualizados', handleApuntesUpdate as EventListener);
+    }, [isOpen, request?.id]);
+
     const handleGuardarApunte = async () => {
         if (!nuevoApunte.trim() || !request?.id) return;
         setGuardandoApunte(true);
@@ -81,6 +94,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
             const apunte = await apuntesApi.crear(request.id, nuevoApunte, userName);
             setApuntes(prev => [apunte, ...prev]);
             setNuevoApunte('');
+            window.dispatchEvent(new CustomEvent('apuntes-actualizados', { detail: { requestId: request.id, source: 'RequestModal' } }));
         } catch (error) {
             console.error("Error al guardar apunte:", error);
             alert("No se pudo guardar el apunte.");
@@ -94,6 +108,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
         try {
             await apuntesApi.eliminar(id);
             setApuntes(prev => prev.filter(a => a.id !== id));
+            window.dispatchEvent(new CustomEvent('apuntes-actualizados', { detail: { requestId: request?.id, source: 'RequestModal' } }));
         } catch (error) {
             console.error("Error al eliminar apunte:", error);
             alert("No se pudo eliminar el apunte.");
@@ -112,6 +127,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
             setApuntes(prev => prev.map(a => a.id === editingApunteId ? actualizado : a));
             setEditingApunteId(null);
             setEditNota('');
+            window.dispatchEvent(new CustomEvent('apuntes-actualizados', { detail: { requestId: request?.id, source: 'RequestModal' } }));
         } catch (error) {
             console.error("Error al actualizar apunte:", error);
             alert("No se pudo actualizar el apunte.");

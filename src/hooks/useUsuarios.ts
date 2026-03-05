@@ -14,12 +14,14 @@ export function useUsuarios() {
     const [usuarios, setUsuarios] = useState<UsuarioDB[]>([]);
     const [cargando, setCargando] = useState(true);
 
+    const userId = user?.id;
+
     useEffect(() => {
         cargarUsuarios();
-    }, [user]);
+    }, [userId]);
 
     const cargarUsuarios = async () => {
-        if (!user) {
+        if (!userId) {
             setUsuarios([]);
             setCargando(false);
             return;

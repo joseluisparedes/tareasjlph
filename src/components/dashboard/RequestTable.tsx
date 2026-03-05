@@ -6,6 +6,7 @@ import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalList
 import { CSS } from '@dnd-kit/utilities';
 import * as XLSX from 'xlsx';
 import { NotesCell } from './NotesCell';
+import { useAuth } from '../../hooks/useAuth';
 
 interface RequestTableProps {
     requests: ITRequest[];
@@ -147,9 +148,12 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({ id, children, onClick, 
 };
 
 export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, onDelete, onDeleteBulk, catalogosUrgencia, onUpdateRequest, domains, catalogos }) => {
+    const { user } = useAuth();
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-    const STORAGE_KEY = 'requestTableConfig';
-    const WIDTHS_STORAGE_KEY = 'requestTableWidths';
+
+    const userKeyStr = user?.id ? `_${user.id}` : '';
+    const STORAGE_KEY = `requestTableConfig${userKeyStr}`;
+    const WIDTHS_STORAGE_KEY = `requestTableWidths${userKeyStr}`;
 
     // Estado para anchos de columnas
     const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
@@ -165,7 +169,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
     // Persistir anchos
     useEffect(() => {
         localStorage.setItem(WIDTHS_STORAGE_KEY, JSON.stringify(columnWidths));
-    }, [columnWidths]);
+    }, [columnWidths, WIDTHS_STORAGE_KEY]);
 
     const handleColumnResize = (colId: string, newWidth: number) => {
         setColumnWidths(prev => ({
@@ -179,7 +183,20 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
     const editInputRef = useRef<HTMLInputElement | HTMLSelectElement>(null);
 
     // Configuración de Ordenamiento
-    const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'createdAt' as keyof ITRequest, direction: 'desc' });
+    const [sortConfig, setSortConfig] = useState<SortConfig>(() => {
+        try {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed.sortConfig) {
+                    return parsed.sortConfig;
+                }
+            }
+        } catch (e) {
+            console.error('Error loading sort config', e);
+        }
+        return { key: 'createdAt' as keyof ITRequest, direction: 'desc' };
+    });
 
     // Focus input on edit
     useEffect(() => {
@@ -437,10 +454,11 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
     React.useEffect(() => {
         const config = {
             visibleColumns: Array.from(visibleColumns),
-            columnOrder
+            columnOrder,
+            sortConfig
         };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-    }, [visibleColumns, columnOrder]);
+    }, [visibleColumns, columnOrder, sortConfig, STORAGE_KEY]);
 
     const sensors = useSensors(
         useSensor(PointerSensor),
@@ -522,13 +540,20 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
     };
 
     const getUrgencyValue = (urgency: string): number => {
-        // Urgencia numérica normalizada: Menor valor = Mayor urgencia
-        // TBD o desconocida = Valor muy alto para ir al final
+        // Obtenemos el valor a partir de la posición en el catálogo si es posible
+        if (catalogosUrgencia && catalogosUrgencia.length > 0) {
+            const index = catalogosUrgencia.findIndex(c => c.valor === urgency);
+            if (index !== -1) {
+                return index + 1;
+            }
+        }
+
+        // Urgencia numérica normalizada (fallback): Menor valor = Mayor urgencia
         const map: Record<string, number> = {
-            [Urgency.Critical]: 1,
-            [Urgency.High]: 2,
-            [Urgency.Medium]: 3,
-            [Urgency.Low]: 4
+            'Muy alta': 1,
+            'Alta': 2,
+            'Media': 3,
+            'Baja': 4
         };
         // Si no está en el mapa, asumimos que es "TBD" o similar (baja urgencia/final)
         return map[urgency] || 999;

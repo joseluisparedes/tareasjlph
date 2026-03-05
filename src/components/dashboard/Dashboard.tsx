@@ -397,7 +397,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         requests={filteredRequests}
                         onEdit={onEditRequest}
                         onStatusChange={onStatusChange}
-                        catalogosUrgencia={catalogos.filter(c => c.tipo === 'urgencia')}
+                        catalogosUrgencia={catalogos.filter(c => c.tipo === 'urgencia').sort((a, b) => (a.orden || 0) - (b.orden || 0))}
                         catalogos={catalogos}
                         onColumnOrderChange={onUpdateCatalogoOrder}
                     />
@@ -407,7 +407,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         onEdit={onEditRequest}
                         onDelete={onDelete}
                         onDeleteBulk={onDeleteBulk}
-                        catalogosUrgencia={catalogos.filter(c => c.tipo === 'urgencia')}
+                        catalogosUrgencia={catalogos.filter(c => c.tipo === 'urgencia').sort((a, b) => (a.orden || 0) - (b.orden || 0))}
                         onUpdateRequest={onUpdateRequest}
                         domains={domains}
                         catalogos={catalogos}

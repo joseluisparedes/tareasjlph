@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { CatalogItem, CatalogoItem, CatalogType, User, ITRequest } from '../../types';
-import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, Edit2, Save, X, Plus, Tag, LayoutGrid, List, Power } from 'lucide-react';
+import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, Edit2, Save, X, Plus, Tag, LayoutGrid, List, GripVertical } from 'lucide-react';
 import { useUsuarios } from '../../hooks/useUsuarios';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface AdminPanelProps {
     domains: CatalogItem[];
@@ -11,7 +14,7 @@ interface AdminPanelProps {
     onAddDomain: (name: string) => void;
     catalogos: CatalogoItem[];
     onAddCatalogo: (tipo: CatalogType, valor: string) => void;
-    onUpdateCatalogo: (id: string, cambios: Partial<Pick<CatalogoItem, 'valor' | 'esta_activo' | 'color' | 'abreviatura'>>) => void;
+    onUpdateCatalogo: (id: string, cambios: Partial<Pick<CatalogoItem, 'valor' | 'esta_activo' | 'color' | 'abreviatura' | 'orden'>>) => void;
     onDeleteCatalogo: (id: string) => void;
     getModo: (tipo: CatalogType) => 'desplegable' | 'cuadros';
     setModo: (tipo: CatalogType, modo: 'desplegable' | 'cuadros') => void;
@@ -34,6 +37,83 @@ const CATALOG_SECTIONS: { tipo: CatalogType; label: string }[] = [
     { tipo: 'complejidad', label: 'Complejidad' },
 ];
 
+// ─── Componente Sortable para un Item de Catálogo ────────────────────────────
+const SortableCatalogItemRow: React.FC<{
+    item: CatalogoItem;
+    tipo: CatalogType;
+    editId: string | null;
+    editVal: string;
+    editAbrev: string;
+    setEditId: (id: string | null) => void;
+    setEditVal: (val: string) => void;
+    setEditAbrev: (abrev: string) => void;
+    handleSaveEdit: (id: string) => void;
+    onUpdate: (id: string, cambios: Partial<CatalogoItem>) => void;
+    handleDeleteClick: (item: CatalogoItem) => void;
+}> = ({ item, tipo, editId, editVal, editAbrev, setEditId, setEditVal, setEditAbrev, handleSaveEdit, onUpdate, handleDeleteClick }) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+
+    const style: React.CSSProperties = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 1 : 'auto',
+        position: 'relative'
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className={`flex items-center justify-between px-4 py-2.5 group ${!item.esta_activo ? 'bg-slate-50' : 'bg-white'}`}>
+            {editId === item.id ? (
+                <div className="flex items-center gap-2 flex-1">
+                    <input autoFocus type="text" placeholder="Valor"
+                        className="flex-1 border border-slate-300 rounded px-2 py-1 text-sm bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 outline-none"
+                        value={editVal} onChange={e => setEditVal(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(item.id); if (e.key === 'Escape') setEditId(null); }} />
+                    <input type="text" placeholder="Abrev."
+                        className="w-20 border border-slate-300 rounded px-2 py-1 text-sm bg-white text-slate-900 focus:ring-1 focus:ring-violet-500 outline-none"
+                        value={editAbrev} onChange={e => setEditAbrev(e.target.value)} />
+                    <button onClick={() => handleSaveEdit(item.id)} className="p-1 text-green-600 hover:bg-green-50 rounded"><Save size={13} /></button>
+                    <button onClick={() => setEditId(null)} className="p-1 text-red-500 hover:bg-red-50 rounded"><X size={13} /></button>
+                </div>
+            ) : (
+                <>
+                    <div className="flex items-center gap-2">
+                        <button {...attributes} {...listeners} className="cursor-grab text-slate-300 hover:text-slate-500 p-0.5 rounded hover:bg-slate-200 shrink-0">
+                            <GripVertical size={14} />
+                        </button>
+                        <div className={`w-1.5 h-1.5 rounded-full ${item.esta_activo ? 'bg-green-500' : 'bg-slate-300'}`} />
+                        {tipo === 'urgencia' && (
+                            <label className="cursor-pointer" title="Cambiar color">
+                                <div className="w-5 h-5 rounded border border-slate-300 shadow-sm flex-shrink-0"
+                                    style={{ backgroundColor: item.color || '#94a3b8' }} />
+                                <input type="color" className="sr-only"
+                                    value={item.color || '#94a3b8'}
+                                    onChange={e => onUpdate(item.id, { color: e.target.value })} />
+                            </label>
+                        )}
+                        <span className={`text-sm ${!item.esta_activo ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{item.valor}</span>
+                        {item.abreviatura && (
+                            <span className="text-xs bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded font-mono font-medium">
+                                {item.abreviatura}
+                            </span>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => { setEditId(item.id); setEditVal(item.valor); setEditAbrev(item.abreviatura || ''); }}
+                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded" title="Editar"><Edit2 size={12} /></button>
+                        <button onClick={() => onUpdate(item.id, { esta_activo: !item.esta_activo })}
+                            className={`text-xs px-2 py-0.5 rounded border transition-colors ${item.esta_activo ? 'border-red-200 text-red-500 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
+                            {item.esta_activo ? 'Desact.' : 'Activar'}
+                        </button>
+                        <button onClick={() => handleDeleteClick(item)}
+                            className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded" title="Eliminar"><Trash2 size={12} /></button>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
 // ─── Sub-componente: lista de un catálogo ───────────────────────────────────
 const CatalogSection: React.FC<{
     tipo: CatalogType;
@@ -41,7 +121,7 @@ const CatalogSection: React.FC<{
     items: CatalogoItem[];
     modo: 'desplegable' | 'cuadros';
     onAdd: (tipo: CatalogType, valor: string) => void;
-    onUpdate: (id: string, cambios: Partial<Pick<CatalogoItem, 'valor' | 'esta_activo' | 'color' | 'abreviatura'>>) => void;
+    onUpdate: (id: string, cambios: Partial<Pick<CatalogoItem, 'valor' | 'esta_activo' | 'color' | 'abreviatura' | 'orden'>>) => void;
     onDelete: (id: string) => void;
     onToggleModo: () => void;
     requests: ITRequest[];
@@ -130,54 +210,45 @@ const CatalogSection: React.FC<{
                 <p className="text-xs text-slate-400 text-center py-4">Sin valores. Agrega el primero.</p>
             ) : (
                 <div className="divide-y divide-slate-100">
-                    {items.map(item => (
-                        <div key={item.id} className={`flex items-center justify-between px-4 py-2.5 ${!item.esta_activo ? 'bg-slate-50' : 'bg-white'}`}>
-                            {editId === item.id ? (
-                                <div className="flex items-center gap-2 flex-1">
-                                    <input autoFocus type="text" placeholder="Valor"
-                                        className="flex-1 border border-slate-300 rounded px-2 py-1 text-sm bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 outline-none"
-                                        value={editVal} onChange={e => setEditVal(e.target.value)}
-                                        onKeyDown={e => { if (e.key === 'Enter') handleSaveEdit(item.id); if (e.key === 'Escape') setEditId(null); }} />
-                                    <input type="text" placeholder="Abrev."
-                                        className="w-20 border border-slate-300 rounded px-2 py-1 text-sm bg-white text-slate-900 focus:ring-1 focus:ring-violet-500 outline-none"
-                                        value={editAbrev} onChange={e => setEditAbrev(e.target.value)} />
-                                    <button onClick={() => handleSaveEdit(item.id)} className="p-1 text-green-600 hover:bg-green-50 rounded"><Save size={13} /></button>
-                                    <button onClick={() => setEditId(null)} className="p-1 text-red-500 hover:bg-red-50 rounded"><X size={13} /></button>
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="flex items-center gap-2">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${item.esta_activo ? 'bg-green-500' : 'bg-slate-300'}`} />
-                                        {tipo === 'urgencia' && (
-                                            <label className="cursor-pointer" title="Cambiar color">
-                                                <div className="w-5 h-5 rounded border border-slate-300 shadow-sm flex-shrink-0"
-                                                    style={{ backgroundColor: item.color || '#94a3b8' }} />
-                                                <input type="color" className="sr-only"
-                                                    value={item.color || '#94a3b8'}
-                                                    onChange={e => onUpdate(item.id, { color: e.target.value })} />
-                                            </label>
-                                        )}
-                                        <span className={`text-sm ${!item.esta_activo ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{item.valor}</span>
-                                        {item.abreviatura && (
-                                            <span className="text-xs bg-violet-100 text-violet-600 px-1.5 py-0.5 rounded font-mono font-medium">
-                                                {item.abreviatura}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <button onClick={() => { setEditId(item.id); setEditVal(item.valor); setEditAbrev(item.abreviatura || ''); }}
-                                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded"><Edit2 size={12} /></button>
-                                        <button onClick={() => onUpdate(item.id, { esta_activo: !item.esta_activo })}
-                                            className={`text-xs px-2 py-0.5 rounded border transition-colors ${item.esta_activo ? 'border-red-200 text-red-500 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
-                                            {item.esta_activo ? 'Desact.' : 'Activar'}
-                                        </button>
-                                        <button onClick={() => handleDeleteClick(item)}
-                                            className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded"><Trash2 size={12} /></button>
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    ))}
+                    <DndContext
+                        sensors={useSensors(
+                            useSensor(PointerSensor),
+                            useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+                        )}
+                        collisionDetection={closestCenter}
+                        onDragEnd={({ active, over }) => {
+                            if (active.id !== over?.id) {
+                                const oldIndex = items.findIndex(i => i.id === active.id);
+                                const newIndex = items.findIndex(i => i.id === over?.id);
+                                const sorted = arrayMove(items, oldIndex, newIndex) as CatalogoItem[];
+                                // Actualizar todos los órdenes
+                                sorted.forEach((item, index) => {
+                                    if (item.orden !== index) {
+                                        onUpdate(item.id, { orden: index });
+                                    }
+                                });
+                            }
+                        }}
+                    >
+                        <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                            {items.sort((a, b) => (a.orden || 0) - (b.orden || 0)).map(item => (
+                                <SortableCatalogItemRow
+                                    key={item.id}
+                                    item={item}
+                                    tipo={tipo}
+                                    editId={editId}
+                                    editVal={editVal}
+                                    editAbrev={editAbrev}
+                                    setEditId={setEditId}
+                                    setEditVal={setEditVal}
+                                    setEditAbrev={setEditAbrev}
+                                    handleSaveEdit={handleSaveEdit}
+                                    onUpdate={onUpdate}
+                                    handleDeleteClick={handleDeleteClick}
+                                />
+                            ))}
+                        </SortableContext>
+                    </DndContext>
                 </div>
             )}
         </div>

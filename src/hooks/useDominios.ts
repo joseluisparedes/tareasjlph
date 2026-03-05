@@ -9,8 +9,10 @@ export function useDominios() {
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const userId = user?.id;
+
     const cargar = useCallback(async () => {
-        if (!user) {
+        if (!userId) {
             setDominios([]);
             setCargando(false);
             return;
@@ -25,7 +27,7 @@ export function useDominios() {
         } finally {
             setCargando(false);
         }
-    }, [user]);
+    }, [userId]);
 
     useEffect(() => {
         cargar();
