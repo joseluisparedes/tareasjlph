@@ -268,6 +268,9 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         if (key === 'tipoTarea') {
             return catalogos?.filter(c => c.tipo === 'tipo_tarea' && c.esta_activo).map(c => ({ value: c.valor, label: c.valor })) || [];
         }
+        if (key === 'ingresadoGestionDemanda') {
+            return catalogos?.filter(c => c.tipo === 'ingresado_gestion_demanda' && c.esta_activo).map(c => ({ value: c.valor, label: c.valor })) || [];
+        }
         return [];
     };
 
@@ -386,8 +389,8 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
             id: 'urgency', key: 'urgency', label: 'Urgencia', sortable: true, editable: true, inputType: 'select',
             render: (req) => <PriorityBadge priority={req.urgency} catalogos={catalogosUrgencia} />
         },
-        // Nueva columna N° Prioridad (priority)
-        { id: 'priority', key: 'priority' as keyof ITRequest, label: 'Prioridad', sortable: true, editable: true, inputType: 'text' },
+        { id: 'prioridad', key: 'priority' as keyof ITRequest, label: 'Prioridad', sortable: true, editable: true, inputType: 'text' },
+        { id: 'ingresadoGestionDemanda', key: 'ingresadoGestionDemanda' as keyof ITRequest, label: 'Ing. Gestión Demanda', sortable: true, editable: true, inputType: 'select' },
         { id: 'tipoTarea', key: 'tipoTarea' as keyof ITRequest, label: 'Tipo Tarea', sortable: true, editable: true, inputType: 'select' },
         { id: 'tareaSN', key: 'tareaSN' as keyof ITRequest, label: 'Tarea SN', sortable: true, editable: true, inputType: 'text' },
         { id: 'ticketRIT', key: 'ticketRIT' as keyof ITRequest, label: 'Ticket RIT', sortable: true, editable: true, inputType: 'text' },

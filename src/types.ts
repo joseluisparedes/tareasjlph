@@ -35,7 +35,8 @@ export type CatalogType =
     | 'institucion'
     | 'tipo_tarea'
     | 'complejidad'
-    | 'dominios';
+    | 'dominios'
+    | 'ingresado_gestion_demanda';
 
 export interface User {
     id: string;
@@ -70,6 +71,7 @@ export interface ITRequest {
     institucion?: string;
     tipoTarea?: string;
     complejidad?: string;
+    ingresadoGestionDemanda?: string;
 }
 
 export interface CatalogItem {
@@ -103,6 +105,7 @@ export interface FilterState {
     status: string[];
     direction: string[]; // Nueva propiedad
     requester: string[]; // Nueva propiedad
+    ingresadoGestionDemanda: string[]; // Nueva propiedad
     search: string;
 }
 

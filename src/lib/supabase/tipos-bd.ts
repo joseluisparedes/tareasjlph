@@ -25,6 +25,7 @@ export interface Solicitud {
     institucion: string | null;
     tipo_tarea: string | null;
     complejidad: string | null;
+    ingresado_gestion_demanda: string | null;
 }
 
 export interface Dominio {

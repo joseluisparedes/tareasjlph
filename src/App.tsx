@@ -44,6 +44,7 @@ function adaptarSolicitud(s: Solicitud, dominios: Dominio[]): ITRequest {
         institucion: s.institucion ?? undefined,
         tipoTarea: s.tipo_tarea ?? undefined,
         complejidad: s.complejidad ?? undefined,
+        ingresadoGestionDemanda: s.ingresado_gestion_demanda ?? undefined,
     };
 }
 
@@ -148,6 +149,7 @@ export default function App() {
             { field: 'assigneeId', type: 'asignado_a' },
             { field: 'tipoTarea', type: 'tipo_tarea' },
             { field: 'complejidad', type: 'complejidad' },
+            { field: 'ingresadoGestionDemanda', type: 'ingresado_gestion_demanda' },
             // Estado y Prioridad suelen ser más estáticos, pero si se permite edición libre:
             { field: 'status', type: 'estado' },
             { field: 'priority', type: 'prioridad' },
@@ -202,6 +204,7 @@ export default function App() {
             institucion: req.institucion || null,
             tipo_tarea: req.tipoTarea || null,
             complejidad: req.complejidad || null,
+            ingresado_gestion_demanda: req.ingresadoGestionDemanda || null,
         };
 
         if (solicitudes.some(s => s.id === req.id)) {
@@ -261,6 +264,7 @@ export default function App() {
             { field: 'assigneeId', type: 'asignado_a' },
             { field: 'tipoTarea', type: 'tipo_tarea' },
             { field: 'complejidad', type: 'complejidad' },
+            { field: 'ingresadoGestionDemanda', type: 'ingresado_gestion_demanda' },
             { field: 'priority', type: 'prioridad' },
             { field: 'status', type: 'estado' },
         ];
@@ -325,7 +329,8 @@ export default function App() {
                 brm: req.brm || null,
                 institucion: req.institucion || null,
                 tipo_tarea: req.tipoTarea || null,
-                complejidad: req.complejidad || null
+                complejidad: req.complejidad || null,
+                ingresado_gestion_demanda: req.ingresadoGestionDemanda || null
             });
         }
     };
@@ -356,6 +361,7 @@ export default function App() {
         if (data.fechaInicio !== undefined) updateData.fecha_inicio = data.fechaInicio;
         if (data.fechaFin !== undefined) updateData.fecha_fin = data.fechaFin;
         if (data.direccionSolicitante !== undefined) updateData.direccion_solicitante = data.direccionSolicitante;
+        if (data.ingresadoGestionDemanda !== undefined) updateData.ingresado_gestion_demanda = data.ingresadoGestionDemanda;
 
         // Historial de fechas
         if (data.fechaInicio && data.fechaInicio !== currentReq.fecha_inicio) {

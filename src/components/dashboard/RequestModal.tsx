@@ -41,6 +41,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
     const instituciones = getCats('institucion');
     const tiposTarea = getCats('tipo_tarea');
     const complejidades = getCats('complejidad');
+    const ingresadoGestionDemanda = getCats('ingresado_gestion_demanda');
 
     // Modos
     const getM = (t: CatalogType) => getModo?.(t) ?? 'desplegable';
@@ -67,7 +68,8 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                 priority: '', tareaSN: '', ticketRIT: '',
                 fechaInicio: '', fechaFin: '',
                 // Nuevos campos vacíos
-                direccionSolicitante: '', brm: '', institucion: '', tipoTarea: '', complejidad: ''
+                direccionSolicitante: '', brm: '', institucion: '', tipoTarea: '', complejidad: '',
+                ingresadoGestionDemanda: 'No'
             });
             setApuntes([]);
         }
@@ -338,6 +340,10 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                     <SelectorCampo label="Tipo de Tarea"
                                         valor={formData.tipoTarea || ''} onChange={v => set('tipoTarea', v)}
                                         opciones={tiposTarea} modo={getM('tipo_tarea')} />
+
+                                    <SelectorCampo label="Ingresado en Gestión de la Demanda"
+                                        valor={formData.ingresadoGestionDemanda || ''} onChange={v => set('ingresadoGestionDemanda', v)}
+                                        opciones={ingresadoGestionDemanda} modo={getM('ingresado_gestion_demanda')} />
                                 </div>
                             </div>
 

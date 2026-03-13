@@ -29,6 +29,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
         status: [],
         direction: [],
         requester: [],
+        ingresadoGestionDemanda: [],
         search: ''
     });
 
@@ -52,6 +53,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
             // Nuevos filtros
             if (filters.direction.length > 0 && (!req.direccionSolicitante || !filters.direction.includes(req.direccionSolicitante))) return false;
             if (filters.requester.length > 0 && (!req.requester || !filters.requester.includes(req.requester))) return false;
+            if (filters.ingresadoGestionDemanda.length > 0 && (!req.ingresadoGestionDemanda || !filters.ingresadoGestionDemanda.includes(req.ingresadoGestionDemanda))) return false;
 
             return true;
         });
@@ -87,6 +89,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                 if (keyToIgnore !== 'status' && filters.status.length > 0 && !filters.status.includes(req.status)) return false;
                 if (keyToIgnore !== 'direction' && filters.direction.length > 0 && (!req.direccionSolicitante || !filters.direction.includes(req.direccionSolicitante))) return false;
                 if (keyToIgnore !== 'requester' && filters.requester.length > 0 && (!req.requester || !filters.requester.includes(req.requester))) return false;
+                if (keyToIgnore !== 'ingresadoGestionDemanda' && filters.ingresadoGestionDemanda.length > 0 && (!req.ingresadoGestionDemanda || !filters.ingresadoGestionDemanda.includes(req.ingresadoGestionDemanda))) return false;
                 return true;
             });
         };
@@ -100,6 +103,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
             status: sortAndFilter(getOptions('status').map(r => r.status)),
             direction: sortAndFilter(getOptions('direction').map(r => r.direccionSolicitante)),
             requester: sortAndFilter(getOptions('requester').map(r => r.requester)),
+            ingresadoGestionDemanda: sortAndFilter(getOptions('ingresadoGestionDemanda').map(r => r.ingresadoGestionDemanda)),
         };
     }, [requests, filters]);
 
@@ -357,6 +361,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     className="w-[150px]"
                 />
 
+                <MultiSelectDropdown
+                    label="Gestión de Demanda"
+                    options={availableOptions.ingresadoGestionDemanda}
+                    selected={filters.ingresadoGestionDemanda}
+                    onChange={(vals) => handleFilterArrayChange('ingresadoGestionDemanda', vals)}
+                    placeholder="Todos"
+                    className="w-[180px]"
+                />
+
 
 
                 {/* Active Filters Display */}
@@ -367,7 +380,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         ...filters.urgency.map(f => ({ key: 'urgency', val: f })),
                         ...filters.status.map(f => ({ key: 'status', val: f })),
                         ...filters.direction.map(f => ({ key: 'direction', val: f })),
-                        ...filters.requester.map(f => ({ key: 'requester', val: f }))
+                        ...filters.requester.map(f => ({ key: 'requester', val: f })),
+                        ...filters.ingresadoGestionDemanda.map(f => ({ key: 'ingresadoGestionDemanda', val: f }))
                     ].map((item, i) => (
                         <span key={i} className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs flex items-center gap-1 border border-blue-100">
                             {item.val}
@@ -379,9 +393,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                             </button>
                         </span>
                     ))}
-                    {(filters.domain.length || filters.type.length || filters.urgency.length || filters.status.length || filters.direction.length || filters.requester.length) ? (
+                    {(filters.domain.length || filters.type.length || filters.urgency.length || filters.status.length || filters.direction.length || filters.requester.length || filters.ingresadoGestionDemanda.length) ? (
                         <button
-                            onClick={() => setFilters({ domain: [], type: [], urgency: [], status: [], direction: [], requester: [], search: '' })}
+                            onClick={() => setFilters({ domain: [], type: [], urgency: [], status: [], direction: [], requester: [], ingresadoGestionDemanda: [], search: '' })}
                             className="text-slate-400 hover:text-red-500 text-xs underline"
                         >
                             Limpiar todo

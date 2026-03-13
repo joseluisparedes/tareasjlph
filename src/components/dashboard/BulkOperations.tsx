@@ -28,6 +28,7 @@ interface ImportRow {
     institucion?: string;
     tipo_tarea?: string;
     complejidad?: string;
+    ingresado_gestion_demanda?: string;
 }
 
 interface ValidatedRow extends ImportRow {
@@ -86,7 +87,8 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
             BRM: req.brm || '',
             Institucion: req.institucion || '',
             Tipo_Tarea: req.tipoTarea || '',
-            Complejidad: req.complejidad || ''
+            Complejidad: req.complejidad || '',
+            Ingresado_Gestion_Demanda: req.ingresadoGestionDemanda || ''
         }));
 
         const csv = Papa.unparse(data);
@@ -115,7 +117,8 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
             BRM: req.brm || '',
             Institucion: req.institucion || '',
             Tipo_Tarea: req.tipoTarea || '',
-            Complejidad: req.complejidad || ''
+            Complejidad: req.complejidad || '',
+            Ingresado_Gestion_Demanda: req.ingresadoGestionDemanda || ''
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(data);
@@ -427,6 +430,7 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
 
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[150px]">Tipo Tarea</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[150px]">Complejidad</th>
+                                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[180px]">Ingresado Gestión Demanda</th>
 
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[140px]">F. Inicio</th>
                                     <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider min-w-[140px]">F. Fin</th>
@@ -516,6 +520,10 @@ export const BulkOperations: React.FC<BulkOperationsProps> = ({ requests, onImpo
                                         <td className={`px-4 py-2 ${row.fieldErrors['complejidad'] ? 'bg-red-100' : ''}`}>
                                             <SelectorCampo valor={row.complejidad || ''} onChange={v => handleUpdateRow(row.id, 'complejidad', v)}
                                                 opciones={getOptionsWithCurrent('complejidad', row.complejidad)} modo={getM('complejidad')} compact />
+                                        </td>
+                                        <td className={`px-4 py-2 ${row.fieldErrors['ingresado_gestion_demanda'] ? 'bg-red-100' : ''}`}>
+                                            <SelectorCampo valor={row.ingresado_gestion_demanda || ''} onChange={v => handleUpdateRow(row.id, 'ingresado_gestion_demanda', v)}
+                                                opciones={getOptionsWithCurrent('ingresado_gestion_demanda', row.ingresado_gestion_demanda)} modo={getM('ingresado_gestion_demanda')} compact />
                                         </td>
 
                                         <td className={`px-4 py-2 ${row.fieldErrors['fecha_inicio'] ? 'bg-red-100' : ''}`}>

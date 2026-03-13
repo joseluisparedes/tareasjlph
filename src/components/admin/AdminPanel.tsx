@@ -35,6 +35,7 @@ const CATALOG_SECTIONS: { tipo: CatalogType; label: string }[] = [
     { tipo: 'institucion', label: 'Institución' },
     { tipo: 'tipo_tarea', label: 'Tipo de Tarea' },
     { tipo: 'complejidad', label: 'Complejidad' },
+    { tipo: 'ingresado_gestion_demanda', label: 'Ingresado en Gestión de la Demanda' },
 ];
 
 // ─── Componente Sortable para un Item de Catálogo ────────────────────────────
