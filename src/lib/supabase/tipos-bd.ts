@@ -73,6 +73,26 @@ export interface SolicitudFecha {
     fecha_registro: string;
 }
 
+export interface TareaColumna {
+    id: string;
+    nombre: string;
+    orden: number;
+    fecha_creacion: string;
+}
+
+export interface Tarea {
+    id: string;
+    titulo: string;
+    descripcion: string | null;
+    columna_id: string | null;
+    estado: 'Activa' | 'Terminada';
+    urgencia: 'Verde' | 'Amarillo' | 'Rojo';
+    orden: number;
+    creado_por: string | null;
+    fecha_creacion: string;
+    fecha_actualizacion: string;
+}
+
 export interface Database {
     public: {
         Tables: {
@@ -100,6 +120,16 @@ export interface Database {
                 Row: Catalogo;
                 Insert: Omit<Catalogo, 'id' | 'fecha_creacion'>;
                 Update: Partial<Omit<Catalogo, 'id' | 'fecha_creacion'>>;
+            };
+            tareas_columnas: {
+                Row: TareaColumna;
+                Insert: Omit<TareaColumna, 'id' | 'fecha_creacion'>;
+                Update: Partial<Omit<TareaColumna, 'id' | 'fecha_creacion'>>;
+            };
+            tareas: {
+                Row: Tarea;
+                Insert: Omit<Tarea, 'id' | 'fecha_creacion' | 'fecha_actualizacion'>;
+                Update: Partial<Omit<Tarea, 'id' | 'fecha_creacion' | 'fecha_actualizacion'>>;
             };
         };
     };

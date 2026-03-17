@@ -95,7 +95,7 @@ export interface CatalogoConfig {
     modo_visualizacion: 'desplegable' | 'cuadros';
 }
 
-export type ViewMode = 'Dashboard' | 'Admin' | 'Reports' | 'Integrations';
+export type ViewMode = 'Dashboard' | 'Admin' | 'Reports' | 'Integrations' | 'Tareas';
 export type DashboardView = 'Kanban' | 'Table';
 
 export interface FilterState {
