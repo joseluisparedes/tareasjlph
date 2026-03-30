@@ -2,19 +2,19 @@ import { supabase } from '../supabase/cliente';
 import type { Solicitud } from '../supabase/tipos-bd';
 
 export const solicitudesApi = {
-    async obtenerTodas(): Promise<Solicitud[]> {
+    async obtenerTodas(): Promise<any[]> {
         const { data, error } = await supabase
             .from('solicitudes')
-            .select('*')
+            .select('*, usuarios!solicitudes_creado_por_fkey(nombre_completo)')
             .order('fecha_creacion', { ascending: false });
         if (error) throw error;
         return data ?? [];
     },
 
-    async obtenerPorId(id: string): Promise<Solicitud> {
+    async obtenerPorId(id: string): Promise<any> {
         const { data, error } = await supabase
             .from('solicitudes')
-            .select('*')
+            .select('*, usuarios!solicitudes_creado_por_fkey(nombre_completo)')
             .eq('id', id)
             .single();
         if (error) throw error;

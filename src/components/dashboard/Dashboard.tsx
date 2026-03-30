@@ -5,6 +5,7 @@ import { RequestTable } from './RequestTable';
 import { LayoutGrid, List, Search, Filter, Plus, DownloadCloud, Save, Trash2, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase/cliente';
 import { MultiSelectDropdown } from '../shared/MultiSelectDropdown';
+import { useAuth } from '../../hooks/useAuth';
 
 interface DashboardProps {
     requests: ITRequest[];
@@ -21,6 +22,7 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onImportTickets, onStatusChange, onDelete, onDeleteBulk, catalogos, onUpdateCatalogoOrder, onUpdateRequest }) => {
+    const { user } = useAuth();
     const [viewMode, setViewMode] = useState<DashboardView>('Kanban');
     const [filters, setFilters] = useState<FilterState>({
         domain: [],
@@ -31,7 +33,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
         requester: [],
         ingresadoGestionDemanda: [],
         brm: [],
-        search: ''
+        search: '',
+        onlyMine: false
     });
 
     const filteredRequests = useMemo(() => {
@@ -56,6 +59,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
             if (filters.requester.length > 0 && (!req.requester || !filters.requester.includes(req.requester))) return false;
             if (filters.ingresadoGestionDemanda.length > 0 && (!req.ingresadoGestionDemanda || !filters.ingresadoGestionDemanda.includes(req.ingresadoGestionDemanda))) return false;
             if (filters.brm.length > 0 && (!req.brm || !filters.brm.includes(req.brm))) return false;
+            
+            // Filtro "Mis Iniciativas"
+            if (filters.onlyMine && user && req.creadorId !== user.id) return false;
 
             return true;
         });
@@ -389,6 +395,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     className="w-[150px]"
                 />
 
+                <div className="flex items-center gap-2 ml-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                    <label className="text-xs font-bold text-slate-600 cursor-pointer flex items-center gap-2">
+                        <input
+                            type="checkbox"
+                            className="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                            checked={filters.onlyMine}
+                            onChange={(e) => setFilters(prev => ({ ...prev, onlyMine: e.target.checked }))}
+                        />
+                        Mis Iniciativas
+                    </label>
+                </div>
 
 
                 {/* Active Filters Display */}
@@ -413,9 +430,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                             </button>
                         </span>
                     ))}
-                    {(filters.domain.length || filters.type.length || filters.urgency.length || filters.status.length || filters.direction.length || filters.requester.length || filters.ingresadoGestionDemanda.length || filters.brm.length) ? (
+                    {(filters.domain.length || filters.type.length || filters.urgency.length || filters.status.length || filters.direction.length || filters.requester.length || filters.ingresadoGestionDemanda.length || filters.brm.length || filters.onlyMine) ? (
                         <button
-                            onClick={() => setFilters({ domain: [], type: [], urgency: [], status: [], direction: [], requester: [], ingresadoGestionDemanda: [], brm: [], search: '' })}
+                            onClick={() => setFilters({ domain: [], type: [], urgency: [], status: [], direction: [], requester: [], ingresadoGestionDemanda: [], brm: [], search: '', onlyMine: false })}
                             className="text-slate-400 hover:text-red-500 text-xs underline"
                         >
                             Limpiar todo

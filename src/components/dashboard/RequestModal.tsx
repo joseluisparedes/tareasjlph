@@ -182,6 +182,11 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                             <h3 className="text-lg font-bold text-slate-800">
                                 {request ? `Editar Solicitud: ${request.id}` : 'Nueva Solicitud TI'}
                             </h3>
+                            {request?.creadorNombre && (
+                                <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
+                                    <User size={10} /> Registrada por: {request.creadorNombre}
+                                </p>
+                            )}
                             <p className="text-xs text-slate-500 mt-0.5">
                                 {request ? 'Modifica los campos necesarios.' : 'Completa la información.'}
                             </p>

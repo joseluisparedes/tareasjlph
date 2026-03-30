@@ -60,6 +60,7 @@ export interface ITRequest {
     dueDate?: string;
     externalId?: string;
     creadorId?: string;
+    creadorNombre?: string;
     // Nuevos campos
     priority?: string;
     fechaInicio?: string;
@@ -109,6 +110,7 @@ export interface FilterState {
     ingresadoGestionDemanda: string[]; // Nueva propiedad
     brm: string[]; // Nueva propiedad
     search: string;
+    onlyMine: boolean; // Nueva propiedad
 }
 
 export interface SavedFilter {

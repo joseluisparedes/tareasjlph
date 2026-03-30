@@ -19,7 +19,7 @@ import { fechasApi } from './lib/api/fechas';
 import { LogOut, Loader2 } from 'lucide-react';
 
 // Adaptadores: convierte tipos de Supabase a tipos del frontend
-function adaptarSolicitud(s: Solicitud, dominios: Dominio[]): ITRequest {
+function adaptarSolicitud(s: any, dominios: Dominio[]): ITRequest {
     const dominio = dominios.find(d => d.id === s.dominio_id);
     return {
         id: s.id,
@@ -34,6 +34,7 @@ function adaptarSolicitud(s: Solicitud, dominios: Dominio[]): ITRequest {
         createdAt: s.fecha_creacion,
         externalId: s.id_externo ?? undefined,
         creadorId: s.creado_por,
+        creadorNombre: s.usuarios?.nombre_completo ?? 'Desconocido',
         // Campos adicionales
         priority: s.prioridad ?? undefined,
         tareaSN: s.tarea_sn ?? undefined,
