@@ -77,6 +77,7 @@ export interface TareaColumna {
     id: string;
     nombre: string;
     orden: number;
+    creado_por: string | null;
     fecha_creacion: string;
 }
 

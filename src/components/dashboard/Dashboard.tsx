@@ -30,6 +30,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
         direction: [],
         requester: [],
         ingresadoGestionDemanda: [],
+        brm: [],
         search: ''
     });
 
@@ -54,6 +55,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
             if (filters.direction.length > 0 && (!req.direccionSolicitante || !filters.direction.includes(req.direccionSolicitante))) return false;
             if (filters.requester.length > 0 && (!req.requester || !filters.requester.includes(req.requester))) return false;
             if (filters.ingresadoGestionDemanda.length > 0 && (!req.ingresadoGestionDemanda || !filters.ingresadoGestionDemanda.includes(req.ingresadoGestionDemanda))) return false;
+            if (filters.brm.length > 0 && (!req.brm || !filters.brm.includes(req.brm))) return false;
 
             return true;
         });
@@ -90,6 +92,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                 if (keyToIgnore !== 'direction' && filters.direction.length > 0 && (!req.direccionSolicitante || !filters.direction.includes(req.direccionSolicitante))) return false;
                 if (keyToIgnore !== 'requester' && filters.requester.length > 0 && (!req.requester || !filters.requester.includes(req.requester))) return false;
                 if (keyToIgnore !== 'ingresadoGestionDemanda' && filters.ingresadoGestionDemanda.length > 0 && (!req.ingresadoGestionDemanda || !filters.ingresadoGestionDemanda.includes(req.ingresadoGestionDemanda))) return false;
+                if (keyToIgnore !== 'brm' && filters.brm.length > 0 && (!req.brm || !filters.brm.includes(req.brm))) return false;
                 return true;
             });
         };
@@ -104,6 +107,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
             direction: sortAndFilter(getOptions('direction').map(r => r.direccionSolicitante)),
             requester: sortAndFilter(getOptions('requester').map(r => r.requester)),
             ingresadoGestionDemanda: sortAndFilter(getOptions('ingresadoGestionDemanda').map(r => r.ingresadoGestionDemanda)),
+            brm: sortAndFilter(getOptions('brm').map(r => r.brm))
         };
     }, [requests, filters]);
 
@@ -168,7 +172,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
     };
 
     const handleLoadFilter = (filter: { config: FilterState }) => {
-        setFilters(filter.config);
+        setFilters({ 
+            ...filter.config, 
+            direction: filter.config.direction || [], 
+            requester: filter.config.requester || [], 
+            ingresadoGestionDemanda: filter.config.ingresadoGestionDemanda || [],
+            brm: filter.config.brm || [] 
+        });
         setIsFilterMenuOpen(false);
     };
 
@@ -370,6 +380,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     className="w-[180px]"
                 />
 
+                <MultiSelectDropdown
+                    label="BRM"
+                    options={availableOptions.brm}
+                    selected={filters.brm}
+                    onChange={(vals) => handleFilterArrayChange('brm', vals)}
+                    placeholder="Todos"
+                    className="w-[150px]"
+                />
+
 
 
                 {/* Active Filters Display */}
@@ -381,7 +400,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         ...filters.status.map(f => ({ key: 'status', val: f })),
                         ...filters.direction.map(f => ({ key: 'direction', val: f })),
                         ...filters.requester.map(f => ({ key: 'requester', val: f })),
-                        ...filters.ingresadoGestionDemanda.map(f => ({ key: 'ingresadoGestionDemanda', val: f }))
+                        ...filters.ingresadoGestionDemanda.map(f => ({ key: 'ingresadoGestionDemanda', val: f })),
+                        ...filters.brm.map(f => ({ key: 'brm', val: f }))
                     ].map((item, i) => (
                         <span key={i} className="bg-blue-50 text-blue-700 px-2 py-1 rounded-md text-xs flex items-center gap-1 border border-blue-100">
                             {item.val}
@@ -393,9 +413,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                             </button>
                         </span>
                     ))}
-                    {(filters.domain.length || filters.type.length || filters.urgency.length || filters.status.length || filters.direction.length || filters.requester.length || filters.ingresadoGestionDemanda.length) ? (
+                    {(filters.domain.length || filters.type.length || filters.urgency.length || filters.status.length || filters.direction.length || filters.requester.length || filters.ingresadoGestionDemanda.length || filters.brm.length) ? (
                         <button
-                            onClick={() => setFilters({ domain: [], type: [], urgency: [], status: [], direction: [], requester: [], ingresadoGestionDemanda: [], search: '' })}
+                            onClick={() => setFilters({ domain: [], type: [], urgency: [], status: [], direction: [], requester: [], ingresadoGestionDemanda: [], brm: [], search: '' })}
                             className="text-slate-400 hover:text-red-500 text-xs underline"
                         >
                             Limpiar todo

@@ -13,12 +13,13 @@ interface SelectorCampoProps {
     fallbackOptions?: string[];
     className?: string;
     compact?: boolean;
+    disabled?: boolean;
 }
 
 const labelClass = "block text-xs font-semibold text-slate-600 uppercase tracking-wide";
 
 export const SelectorCampo: React.FC<SelectorCampoProps> = ({
-    label, valor, onChange, opciones, modo, required, placeholder = "-- Selecciona --", fallbackOptions, className, compact
+    label, valor, onChange, opciones, modo, required, placeholder = "-- Selecciona --", fallbackOptions, className, compact, disabled
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -65,8 +66,8 @@ export const SelectorCampo: React.FC<SelectorCampoProps> = ({
                 {label && <label className={labelClass}>{label} {required && <span className="text-red-500 normal-case">*</span>}</label>}
                 <div className={`mt-1 flex flex-wrap gap-1.5 ${compact ? 'flex-nowrap overflow-x-auto no-scrollbar' : ''}`}>
                     {!required && (
-                        <button type="button" onClick={() => onChange('')}
-                            className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-all whitespace-nowrap ${!valor
+                        <button type="button" onClick={() => !disabled && onChange('')} disabled={disabled}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-all whitespace-nowrap ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${!valor
                                 ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
                                 : 'bg-white text-slate-400 border-slate-200 hover:border-slate-400'}`}>
                             {compact ? '—' : (placeholder || '—')}
@@ -76,8 +77,8 @@ export const SelectorCampo: React.FC<SelectorCampoProps> = ({
                         const val = op.valor;
                         const selected = valor === val;
                         return (
-                            <button key={op.id || val} type="button" title={val} onClick={() => onChange(val)}
-                                className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all whitespace-nowrap ${selected
+                            <button key={op.id || val} type="button" title={val} onClick={() => !disabled && onChange(val)} disabled={disabled}
+                                className={`px-2.5 py-1 rounded-md text-xs font-semibold border transition-all whitespace-nowrap ${disabled ? 'opacity-60 cursor-not-allowed' : ''} ${selected
                                     ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                                     : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400 hover:text-blue-600'
                                     }`}
@@ -99,8 +100,9 @@ export const SelectorCampo: React.FC<SelectorCampoProps> = ({
             <div className="relative mt-1">
                 <button
                     type="button"
-                    onClick={() => setIsOpen(!isOpen)}
-                    className={`relative w-full cursor-default rounded-md border bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-xs ${compact ? 'h-8' : ''} ${!valor ? 'text-slate-500' : 'text-slate-900'} border-slate-300`}
+                    onClick={() => !disabled && setIsOpen(!isOpen)}
+                    disabled={disabled}
+                    className={`relative w-full cursor-default rounded-md border bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-xs ${compact ? 'h-8' : ''} ${!valor ? 'text-slate-500' : 'text-slate-900'} border-slate-300 ${disabled ? 'bg-slate-50 opacity-70 cursor-not-allowed' : ''}`}
                 >
                     <span className="block truncate">{valor || placeholder}</span>
                     <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">

@@ -33,6 +33,7 @@ function adaptarSolicitud(s: Solicitud, dominios: Dominio[]): ITRequest {
         assigneeId: s.asignado_a,
         createdAt: s.fecha_creacion,
         externalId: s.id_externo ?? undefined,
+        creadorId: s.creado_por,
         // Campos adicionales
         priority: s.prioridad ?? undefined,
         tareaSN: s.tarea_sn ?? undefined,
@@ -209,21 +210,7 @@ export default function App() {
         };
 
         if (solicitudes.some(s => s.id === req.id)) {
-            // Detectar cambios de fecha y registrar historial
-            const solicitudAnterior = solicitudes.find(s => s.id === req.id);
-            if (solicitudAnterior) {
-                const fechaInicioAnterior = solicitudAnterior.fecha_inicio;
-                const fechaFinAnterior = solicitudAnterior.fecha_fin;
-                const nuevaFechaInicio = datos.fecha_inicio;
-                const nuevaFechaFin = datos.fecha_fin;
-
-                if (nuevaFechaInicio && nuevaFechaInicio !== fechaInicioAnterior) {
-                    await fechasApi.registrar(req.id, 'inicio', nuevaFechaInicio, user.id);
-                }
-                if (nuevaFechaFin && nuevaFechaFin !== fechaFinAnterior) {
-                    await fechasApi.registrar(req.id, 'fin', nuevaFechaFin, user.id);
-                }
-            }
+            // El backend/Trigger de Supabase maneja el registro del historial de fechas automáticamente al detectar el UPDATE.
             await actualizarSolicitud(req.id, datos);
         } else {
             const nueva = await crearSolicitud(datos);
@@ -364,14 +351,7 @@ export default function App() {
         if (data.direccionSolicitante !== undefined) updateData.direccion_solicitante = data.direccionSolicitante;
         if (data.ingresadoGestionDemanda !== undefined) updateData.ingresado_gestion_demanda = data.ingresadoGestionDemanda;
 
-        // Historial de fechas
-        if (data.fechaInicio && data.fechaInicio !== currentReq.fecha_inicio) {
-            await fechasApi.registrar(id, 'inicio', data.fechaInicio, user.id);
-        }
-        if (data.fechaFin && data.fechaFin !== currentReq.fecha_fin) {
-            await fechasApi.registrar(id, 'fin', data.fechaFin, user.id);
-        }
-
+        // El historial de fechas es manejado por un trigger en el backend de Supabase.
         await actualizarSolicitud(id, updateData);
     };
 

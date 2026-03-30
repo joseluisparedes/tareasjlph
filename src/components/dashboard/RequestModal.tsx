@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ITRequest, RequestType, Urgency, Status, CatalogItem, CatalogoItem, CatalogType } from '../../types';
 import type { SolicitudFecha, SolicitudApunte } from '../../lib/supabase/tipos-bd';
 import { apuntesApi } from '../../lib/api/apuntes';
@@ -25,7 +25,12 @@ const labelClass = "block text-xs font-semibold text-slate-600 uppercase trackin
 export const RequestModal: React.FC<RequestModalProps> = ({
     isOpen, onClose, request, onSave, onDelete, domains, catalogos, historialFechas = [], getModo
 }) => {
-    const { perfil } = useAuth();
+    const { perfil, user, esAdministrador } = useAuth();
+    
+    // Verificamos si el usuario actual tiene permisos para editar la solicitud actual
+    // Si no hay request (es una nueva), sí puede editar.
+    const canEdit = esAdministrador || !request || request.creadorId === user?.id;
+    const isReadOnly = !canEdit;
 
     // Filtrar catálogos activos
     const getCats = (tipo: CatalogType) => catalogos.filter(c => c.tipo === tipo && c.esta_activo);
@@ -47,6 +52,8 @@ export const RequestModal: React.FC<RequestModalProps> = ({
     const getM = (t: CatalogType) => getModo?.(t) ?? 'desplegable';
 
     const [formData, setFormData] = useState<Partial<ITRequest>>({});
+    const [isSavingRequest, setIsSavingRequest] = useState(false);
+    const savingRef = useRef(false); // Bloqueo 100% sincrónico
     const [apuntes, setApuntes] = useState<SolicitudApunte[]>([]);
     const [nuevoApunte, setNuevoApunte] = useState('');
     const [guardandoApunte, setGuardandoApunte] = useState(false);
@@ -141,14 +148,26 @@ export const RequestModal: React.FC<RequestModalProps> = ({
     const set = (field: keyof ITRequest, value: unknown) =>
         setFormData(prev => ({ ...prev, [field]: value }));
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (savingRef.current) return;
+        savingRef.current = true;
+        setIsSavingRequest(true);
         const newRequest = {
             ...formData,
             id: formData.id || `BRM-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
             createdAt: formData.createdAt || new Date().toISOString(),
         } as ITRequest;
-        onSave(newRequest);
+        await onSave(newRequest);
+        savingRef.current = false;
+        setIsSavingRequest(false); // Por si se mantiene abierto, restauramos.
+    };
+    
+    // Función ayudante para mostrar fecha en DD/MM/YYYY
+    const formatearFecha = (fechaStr: string) => {
+        if (!fechaStr) return '';
+        const partes = fechaStr.split('-');
+        return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : fechaStr;
     };
 
     return (
@@ -188,6 +207,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                             <input type="text" required className={inputClass}
                                                 value={formData.title || ''}
                                                 onChange={e => set('title', e.target.value)}
+                                                disabled={isReadOnly}
                                                 placeholder="Ej: Migración de Servidor..." />
                                         </div>
                                         <div>
@@ -195,6 +215,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                             <textarea rows={4} className={inputClass}
                                                 value={formData.description || ''}
                                                 onChange={e => set('description', e.target.value)}
+                                                disabled={isReadOnly}
                                                 placeholder="Detalle..." />
                                         </div>
                                     </div>
@@ -221,7 +242,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                                             <span className="text-[10px] text-slate-400">
                                                                 {apunte.creado_por || 'Sistema'}
                                                             </span>
-                                                            {editingApunteId !== apunte.id && (
+                                                            {editingApunteId !== apunte.id && canEdit && (
                                                                 <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                                                                     <button type="button" onClick={() => handleIniciarEdicion(apunte)} className="text-blue-400 hover:text-blue-600 p-0.5">
                                                                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
@@ -255,34 +276,38 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                     </div>
 
                                     {/* Input Nuevo Apunte */}
-                                    <div className="flex gap-2 items-end">
-                                        <div className="flex-1">
-                                            <textarea
-                                                rows={2}
-                                                className="w-full text-xs rounded border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none p-2"
-                                                placeholder="Escribe una actualización..."
-                                                value={nuevoApunte}
-                                                onChange={e => setNuevoApunte(e.target.value)}
-                                                onKeyDown={e => {
-                                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                                        e.preventDefault();
-                                                        handleGuardarApunte();
-                                                    }
-                                                }}
-                                            />
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleGuardarApunte}
-                                            disabled={!nuevoApunte.trim() || guardandoApunte || !request?.id}
-                                            className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                            title="Guardar Apunte"
-                                        >
-                                            <Save size={16} />
-                                        </button>
-                                    </div>
-                                    {!request?.id && (
-                                        <p className="text-[10px] text-orange-500 mt-1">Guarda la solicitud primero para agregar apuntes.</p>
+                                    {canEdit && (
+                                        <>
+                                            <div className="flex gap-2 items-end">
+                                                <div className="flex-1">
+                                                    <textarea
+                                                        rows={2}
+                                                        className="w-full text-xs rounded border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none p-2"
+                                                        placeholder="Escribe una actualización..."
+                                                        value={nuevoApunte}
+                                                        onChange={e => setNuevoApunte(e.target.value)}
+                                                        onKeyDown={e => {
+                                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                                e.preventDefault();
+                                                                handleGuardarApunte();
+                                                            }
+                                                        }}
+                                                    />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={handleGuardarApunte}
+                                                    disabled={!nuevoApunte.trim() || guardandoApunte || !request?.id}
+                                                    className="p-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                    title="Guardar Apunte"
+                                                >
+                                                    <Save size={16} />
+                                                </button>
+                                            </div>
+                                            {!request?.id && (
+                                                <p className="text-[10px] text-orange-500 mt-1">Guarda la solicitud primero para agregar apuntes.</p>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -301,20 +326,20 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                         <label className={labelClass}>Dominio TI <span className="text-red-500 normal-case">*</span></label>
                                         {(getM('dominios') === 'cuadros') ? ( // OJO: 'dominios' es especial porque viene de props.domains
                                             <div className="mt-1 flex flex-wrap gap-1.5">
-                                                <button type="button" onClick={() => set('domain', '')}
-                                                    className={`px-2.5 py-1 rounded-md text-xs font-medium border ${!formData.domain ? 'bg-slate-700 text-white' : 'bg-white text-slate-400'}`}>
+                                                <button type="button" onClick={() => !isReadOnly && set('domain', '')} disabled={isReadOnly}
+                                                    className={`px-2.5 py-1 rounded-md text-xs font-medium border ${isReadOnly ? 'opacity-60 cursor-not-allowed' : ''} ${!formData.domain ? 'bg-slate-700 text-white' : 'bg-white text-slate-400'}`}>
                                                     -- Selecciona --
                                                 </button>
                                                 {domains.filter(d => d.isActive).map(d => (
-                                                    <button key={d.id} type="button" onClick={() => set('domain', d.name)}
-                                                        className={`px-2.5 py-1 rounded-md text-xs font-semibold border ${formData.domain === d.name ? 'bg-blue-600 text-white shadow-sm scale-105' : 'bg-white text-slate-600 hover:border-blue-400'}`}>
+                                                    <button key={d.id} type="button" onClick={() => !isReadOnly && set('domain', d.name)} disabled={isReadOnly}
+                                                        className={`px-2.5 py-1 rounded-md text-xs font-semibold border ${isReadOnly ? 'opacity-60 cursor-not-allowed' : ''} ${formData.domain === d.name ? 'bg-blue-600 text-white shadow-sm scale-105' : 'bg-white text-slate-600 hover:border-blue-400'}`}>
                                                         {d.name}
                                                     </button>
                                                 ))}
                                                 {!formData.domain && <input type="text" required readOnly value="" className="sr-only" />}
                                             </div>
                                         ) : (
-                                            <select required className={inputClass} value={formData.domain || ''} onChange={e => set('domain', e.target.value)}>
+                                            <select required disabled={isReadOnly} className={`${inputClass} ${isReadOnly ? 'bg-slate-50 opacity-70 cursor-not-allowed' : ''}`} value={formData.domain || ''} onChange={e => set('domain', e.target.value)}>
                                                 <option value="">-- Selecciona --</option>
                                                 {domains.filter(d => d.isActive).map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                                             </select>
@@ -322,27 +347,27 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                     </div>
 
                                     <SelectorCampo label="Tipo Requerimiento" required
-                                        valor={formData.type || ''} onChange={v => set('type', v)}
+                                        valor={formData.type || ''} onChange={v => set('type', v)} disabled={isReadOnly}
                                         opciones={tiposReq} modo={getM('tipo_requerimiento')} />
 
                                     <SelectorCampo label="Urgencia" required
-                                        valor={formData.urgency || ''} onChange={v => set('urgency', v)}
+                                        valor={formData.urgency || ''} onChange={v => set('urgency', v)} disabled={isReadOnly}
                                         opciones={urgencias} modo={getM('urgencia')} />
 
                                     <SelectorCampo label="Estado" required
-                                        valor={formData.status || ''} onChange={v => set('status', v)}
+                                        valor={formData.status || ''} onChange={v => set('status', v)} disabled={isReadOnly}
                                         opciones={estados} modo={getM('estado')} />
 
                                     <SelectorCampo label="Complejidad"
-                                        valor={formData.complejidad || ''} onChange={v => set('complejidad', v)}
+                                        valor={formData.complejidad || ''} onChange={v => set('complejidad', v)} disabled={isReadOnly}
                                         opciones={complejidades} modo={getM('complejidad')} />
 
                                     <SelectorCampo label="Tipo de Tarea"
-                                        valor={formData.tipoTarea || ''} onChange={v => set('tipoTarea', v)}
+                                        valor={formData.tipoTarea || ''} onChange={v => set('tipoTarea', v)} disabled={isReadOnly}
                                         opciones={tiposTarea} modo={getM('tipo_tarea')} />
 
                                     <SelectorCampo label="Ingresado en Gestión de la Demanda"
-                                        valor={formData.ingresadoGestionDemanda || ''} onChange={v => set('ingresadoGestionDemanda', v)}
+                                        valor={formData.ingresadoGestionDemanda || ''} onChange={v => set('ingresadoGestionDemanda', v)} disabled={isReadOnly}
                                         opciones={ingresadoGestionDemanda} modo={getM('ingresado_gestion_demanda')} />
                                 </div>
                             </div>
@@ -357,34 +382,25 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                 </h4>
                                 <div className="grid grid-cols-6 gap-x-4 gap-y-4">
                                     <SelectorCampo label="Usuario Solicitante" required
-                                        valor={formData.requester || ''} onChange={v => set('requester', v)}
+                                        valor={formData.requester || ''} onChange={v => set('requester', v)} disabled={isReadOnly}
                                         opciones={usuarios} modo={getM('usuario_solicitante')}
                                         placeholder={usuarios.length === 0 ? "Escribe nombre..." : "-- Selecciona --"} />
 
                                     {/* Input fallback manual si no hay catálogo de usuarios (comportamiento anterior) */}
                                     {usuarios.length === 0 && getM('usuario_solicitante') === 'desplegable' && (
-                                        <div className="-mt-14 opacity-0 pointer-events-none absolute"><input required /> {/* Hack validación HTML5 si hidden */} </div>
-                                        // Mejor dejar que el SelectorCampo maneje el fallback si no hay opciones.
-                                        // Si no hay opciones y es desplegable, SelectorCampo muestra un select vacío.
-                                        // Ajuste: Si usuarios es vacío, deberíamos mostrar input text simple como antes.
-                                        // Corrijo lógica abajo al llamar SelectorCampo o condicional.
+                                        <div className="-mt-14 opacity-0 pointer-events-none absolute"><input required disabled={isReadOnly} /> {/* Hack validación HTML5 si hidden */} </div>
                                     )}
-                                    {/* Nota: Para simplificar, si el catálogo de usuarios está vacío, el admin debería llenarlo o el usuario no podrá elegir. 
-                                        El código anterior tenía un input text fallback. 
-                                        En este refactor asumo que se usarán catálogos. 
-                                        Pero restauraré el input text si la lista está vacía para 'solicitante' específicamente.
-                                    */}
 
                                     <SelectorCampo label="Dirección Solicitante"
-                                        valor={formData.direccionSolicitante || ''} onChange={v => set('direccionSolicitante', v)}
+                                        valor={formData.direccionSolicitante || ''} onChange={v => set('direccionSolicitante', v)} disabled={isReadOnly}
                                         opciones={direcciones} modo={getM('direccion_solicitante')} />
 
                                     <SelectorCampo label="Institución"
-                                        valor={formData.institucion || ''} onChange={v => set('institucion', v)}
+                                        valor={formData.institucion || ''} onChange={v => set('institucion', v)} disabled={isReadOnly}
                                         opciones={instituciones} modo={getM('institucion')} />
 
                                     <SelectorCampo label="BRM"
-                                        valor={formData.brm || ''} onChange={v => set('brm', v)}
+                                        valor={formData.brm || ''} onChange={v => set('brm', v)} disabled={isReadOnly}
                                         opciones={brms} modo={getM('brm')} />
                                 </div>
                             </div>
@@ -399,36 +415,36 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                 </h4>
                                 <div className="grid grid-cols-6 gap-x-4 gap-y-4">
                                     <SelectorCampo label="Asignado A"
-                                        valor={formData.assigneeId || ''} onChange={v => set('assigneeId', v || null)}
+                                        valor={formData.assigneeId || ''} onChange={v => set('assigneeId', v || null)} disabled={isReadOnly}
                                         opciones={asignados} modo={getM('asignado_a')} placeholder="-- Sin asignar --" />
 
                                     <div className="col-span-6 sm:col-span-2">
                                         <label className={labelClass}>Prioridad</label>
-                                        <input type="text" className={inputClass}
+                                        <input type="text" className={inputClass} disabled={isReadOnly}
                                             value={formData.priority || ''} onChange={e => set('priority', e.target.value)}
                                             placeholder="P-001" />
                                     </div>
                                     <div className="col-span-6 sm:col-span-2">
                                         <label className={labelClass}>Tarea SN</label>
-                                        <input type="text" className={inputClass}
+                                        <input type="text" className={inputClass} disabled={isReadOnly}
                                             value={formData.tareaSN || ''} onChange={e => set('tareaSN', e.target.value)}
                                             placeholder="SN-..." />
                                     </div>
                                     <div className="col-span-6 sm:col-span-2">
                                         <label className={labelClass}>Ticket RIT</label>
-                                        <input type="text" className={inputClass}
+                                        <input type="text" className={inputClass} disabled={isReadOnly}
                                             value={formData.ticketRIT || ''} onChange={e => set('ticketRIT', e.target.value)}
                                             placeholder="RIT-..." />
                                     </div>
 
                                     <div className="col-span-6 sm:col-span-3">
                                         <label className={labelClass}>Fecha Inicio</label>
-                                        <input type="date" className={inputClass}
+                                        <input type="date" className={inputClass} disabled={isReadOnly}
                                             value={formData.fechaInicio || ''} onChange={e => set('fechaInicio', e.target.value)} />
                                     </div>
                                     <div className="col-span-6 sm:col-span-3">
                                         <label className={labelClass}>Fecha Fin</label>
-                                        <input type="date" className={inputClass}
+                                        <input type="date" className={inputClass} disabled={isReadOnly}
                                             value={formData.fechaFin || ''} onChange={e => set('fechaFin', e.target.value)} />
                                     </div>
                                 </div>
@@ -439,15 +455,20 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                         <h5 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
                                             <History size={11} /> Historial Fechas
                                         </h5>
-                                        <ul className="space-y-1">
+                                        <ul className="space-y-2">
                                             {historialFechas.map(h => (
-                                                <li key={h.id} className="text-xs flex justify-between text-slate-600">
-                                                    <span>
-                                                        <span className={`font-semibold ${h.tipo === 'inicio' ? 'text-blue-600' : 'text-orange-600'}`}>
-                                                            {h.tipo === 'inicio' ? 'Inicio' : 'Fin'}:
-                                                        </span> {h.fecha}
-                                                    </span>
-                                                    <span className="text-slate-400 opacity-75">{new Date(h.fecha_registro).toLocaleDateString()}</span>
+                                                <li key={h.id} className="text-xs flex flex-col text-slate-600 bg-white p-1.5 rounded border border-slate-100">
+                                                    <div className="flex justify-between w-full">
+                                                        <span>
+                                                            <span className={`font-semibold ${h.tipo === 'inicio' ? 'text-blue-600' : 'text-orange-600'}`}>
+                                                                {h.tipo === 'inicio' ? 'Inicio' : 'Fin'}:
+                                                            </span> {formatearFecha(h.fecha)}
+                                                        </span>
+                                                        <span className="text-slate-400 opacity-75">{new Date(h.fecha_registro).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                                                    </div>
+                                                    <div className="text-[9px] text-slate-400 mt-0.5">
+                                                        Por: {h.cambiado_por === user?.id ? (perfil?.nombre_completo || 'Tú') : 'Usuario Colaborador'}
+                                                    </div>
                                                 </li>
                                             ))}
                                         </ul>
@@ -458,7 +479,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
 
                         {/* Footer */}
                         <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl flex justify-between gap-3">
-                            {request && (
+                            {request && canEdit && (
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -475,12 +496,15 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                             <div className="flex gap-3 ml-auto">
                                 <button type="button" onClick={onClose}
                                     className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors">
-                                    Cancelar
+                                    {canEdit ? 'Cancelar' : 'Cerrar'}
                                 </button>
-                                <button type="submit"
-                                    className="px-5 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
-                                    <Save size={15} /> Guardar Solicitud
-                                </button>
+                                {canEdit && (
+                                    <button type="submit"
+                                        disabled={isSavingRequest}
+                                        className={`px-5 py-2 text-sm font-medium text-white rounded-lg transition-colors flex items-center gap-2 shadow-sm ${isSavingRequest ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>
+                                        <Save size={15} /> {isSavingRequest ? 'Guardando...' : 'Guardar Solicitud'}
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </form>

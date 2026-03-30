@@ -59,6 +59,7 @@ export interface ITRequest {
     createdAt: string;
     dueDate?: string;
     externalId?: string;
+    creadorId?: string;
     // Nuevos campos
     priority?: string;
     fechaInicio?: string;
@@ -106,6 +107,7 @@ export interface FilterState {
     direction: string[]; // Nueva propiedad
     requester: string[]; // Nueva propiedad
     ingresadoGestionDemanda: string[]; // Nueva propiedad
+    brm: string[]; // Nueva propiedad
     search: string;
 }
 

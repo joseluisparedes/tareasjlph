@@ -22,9 +22,17 @@ export function useTareas() {
     const cargarDatos = async () => {
         try {
             setCargando(true);
+            let tareasQuery = supabase.from('tareas').select('*').order('orden', { ascending: true });
+            let colsQuery = supabase.from('tareas_columnas').select('*').order('orden', { ascending: true });
+
+            if (user) {
+                tareasQuery = tareasQuery.eq('creado_por', user.id);
+                colsQuery = colsQuery.eq('creado_por', user.id);
+            }
+
             const [colsResponse, tareasResponse] = await Promise.all([
-                supabase.from('tareas_columnas').select('*').order('orden', { ascending: true }),
-                supabase.from('tareas').select('*').order('orden', { ascending: true })
+                colsQuery,
+                tareasQuery
             ]);
 
             if (colsResponse.error) throw colsResponse.error;
@@ -68,12 +76,12 @@ export function useTareas() {
         
         // Optimistic UI
         const tempId = `temp-${Date.now()}`;
-        const nuevaColumna = { id: tempId, nombre, orden, fecha_creacion: new Date().toISOString() };
+        const nuevaColumna = { id: tempId, nombre, orden, creado_por: user?.id || null, fecha_creacion: new Date().toISOString() };
         setColumnas(prev => [...prev, nuevaColumna]);
 
         const { data, error } = await supabase
             .from('tareas_columnas')
-            .insert([{ nombre, orden }])
+            .insert([{ nombre, orden, creado_por: user?.id || null }])
             .select()
             .single();
 
@@ -106,6 +114,22 @@ export function useTareas() {
             .eq('id', id);
 
         if (error) throw error;
+    };
+
+    const reordenarColumnas = async (ordenes: { id: string; orden: number }[]) => {
+        // Ejecución en paralelo de los updates
+        const promesas = ordenes.map(col =>
+            supabase
+                .from('tareas_columnas')
+                .update({ orden: col.orden })
+                .eq('id', col.id)
+        );
+        const resultados = await Promise.all(promesas);
+        const errores = resultados.filter(r => r.error);
+        if (errores.length > 0) {
+            console.error('Error reordenando verticales', errores);
+            cargarDatos();
+        }
     };
 
     const crearTarea = async (titulo: string, descripcion: string | null, columna_id: string, urgencia: 'Verde'|'Amarillo'|'Rojo' = 'Verde') => {
@@ -224,6 +248,7 @@ export function useTareas() {
         crearColumna,
         actualizarColumna,
         eliminarColumna,
+        reordenarColumnas,
         crearTarea,
         actualizarTarea,
         eliminarTarea,

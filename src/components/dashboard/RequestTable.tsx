@@ -148,7 +148,7 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({ id, children, onClick, 
 };
 
 export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, onDelete, onDeleteBulk, catalogosUrgencia, onUpdateRequest, domains, catalogos }) => {
-    const { user } = useAuth();
+    const { user, esAdministrador } = useAuth();
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     const userKeyStr = user?.id ? `_${user.id}` : '';
@@ -276,6 +276,8 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
 
     // Render Editable Cell
     const renderCellContent = (req: ITRequest, col: ColumnConfig & { id: string }) => {
+        const canEdit = esAdministrador || req.creadorId === user?.id;
+        const isEditableCol = col.editable && canEdit;
         const isEditing = editingCell?.id === req.id && editingCell?.field === col.key;
         const value = isEditing ? editingCell.value : req[col.key];
 
@@ -330,14 +332,14 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         // Standard Render
         return (
             <div
-                className={`w-full h-full min-h-[24px] flex items-center ${col.id === 'title' ? '' : 'justify-center'} ${col.editable ? 'cursor-text hover:bg-slate-50 px-1 -mx-1 rounded border border-transparent hover:border-slate-200' : ''}`}
+                className={`w-full h-full min-h-[24px] flex items-center ${col.id === 'title' ? '' : 'justify-center'} ${isEditableCol ? 'cursor-text hover:bg-slate-50 px-1 -mx-1 rounded border border-transparent hover:border-slate-200' : ''}`}
                 onClick={(e) => {
-                    if (col.editable && onUpdateRequest) {
+                    if (isEditableCol && onUpdateRequest) {
                         e.stopPropagation();
                         startEditing(req, col.key as string, req[col.key]);
                     }
                 }}
-                title={col.editable ? "Clic para editar" : undefined}
+                title={isEditableCol ? "Clic para editar" : undefined}
             >
                 {col.render ? col.render(req) : (req[col.key] as React.ReactNode || <span className="text-gray-300 italic text-xs">Vacío</span>)}
             </div>
@@ -359,7 +361,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         { id: 'id', key: 'id' as keyof ITRequest, label: 'ID', sortable: true, editable: false },
         {
             id: 'apuntes', key: 'id' as keyof ITRequest, label: 'Apuntes y Actualizaciones', sortable: false, editable: false,
-            render: (req) => <NotesCell requestId={req.id} />
+            render: (req) => <NotesCell requestId={req.id} canEdit={esAdministrador || req.creadorId === user?.id} />
         },
         {
             id: 'title', key: 'title', label: 'Título', sortable: true, editable: true, inputType: 'text',
@@ -510,14 +512,20 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
 
 
     const toggleSelectAll = () => {
-        if (selectedIds.size === requests.length) {
+        // Solo seleccionar las que puede eliminar
+        const selectableIds = requests
+            .filter(r => esAdministrador || r.creadorId === user?.id)
+            .map(r => r.id);
+            
+        if (selectedIds.size === selectableIds.length && selectableIds.length > 0) {
             setSelectedIds(new Set());
         } else {
-            setSelectedIds(new Set(requests.map(r => r.id)));
+            setSelectedIds(new Set(selectableIds));
         }
     };
 
-    const toggleSelect = (id: string) => {
+    const toggleSelect = (id: string, canEdit: boolean) => {
+        if (!canEdit) return;
         const newSelected = new Set(selectedIds);
         if (newSelected.has(id)) {
             newSelected.delete(id);
@@ -628,8 +636,9 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         setVisibleColumns(newVisible);
     };
 
-    const isAllSelected = requests.length > 0 && selectedIds.size === requests.length;
-    const isIndeterminate = selectedIds.size > 0 && selectedIds.size < requests.length;
+    const selectableCount = requests.filter(r => esAdministrador || r.creadorId === user?.id).length;
+    const isAllSelected = selectableCount > 0 && selectedIds.size === selectableCount;
+    const isIndeterminate = selectedIds.size > 0 && selectedIds.size < selectableCount;
 
     return (
         <div className="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-lg h-full flex flex-col overflow-hidden">
@@ -749,6 +758,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
                         {sortedRequests.map((req) => {
+                            const canEdit = esAdministrador || req.creadorId === user?.id;
                             const isSelected = selectedIds.has(req.id);
                             return (
                                 <tr
@@ -757,16 +767,18 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
                                     onClick={() => onEdit(req)}
                                 >
                                     <td className="py-4 pl-4 pr-3 text-sm sm:pl-6" onClick={(e) => e.stopPropagation()}>
-                                        <button
-                                            onClick={() => toggleSelect(req.id)}
-                                            className="text-slate-400 hover:text-blue-600 focus:outline-none"
-                                        >
-                                            {isSelected ? (
-                                                <CheckSquare size={18} className="text-blue-600" />
-                                            ) : (
-                                                <Square size={18} />
-                                            )}
-                                        </button>
+                                        {canEdit && (
+                                            <button
+                                                onClick={() => toggleSelect(req.id, canEdit)}
+                                                className="text-slate-400 hover:text-blue-600 focus:outline-none"
+                                            >
+                                                {isSelected ? (
+                                                    <CheckSquare size={18} className="text-blue-600" />
+                                                ) : (
+                                                    <Square size={18} />
+                                                )}
+                                            </button>
+                                        )}
                                     </td>
 
                                     {columnOrder.map(colId => {
@@ -784,20 +796,22 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
 
                                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                                         <div className="flex justify-end gap-2">
-                                            <button
-                                                className="text-gray-400 hover:text-red-600 transition-colors"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    if (window.confirm('¿Eliminar esta solicitud?')) {
-                                                        onDelete(req.id);
-                                                    }
-                                                }}
-                                                title="Eliminar"
-                                            >
-                                                <Trash2 size={16} />
-                                            </button>
-                                            <button className="text-gray-400 hover:text-blue-600" onClick={e => { e.stopPropagation(); onEdit(req); }}>
-                                                <MoreHorizontal size={16} />
+                                            {canEdit && (
+                                                <button
+                                                    className="text-gray-400 hover:text-red-600 transition-colors"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (window.confirm('¿Eliminar esta solicitud?')) {
+                                                            onDelete(req.id);
+                                                        }
+                                                    }}
+                                                    title="Eliminar"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            )}
+                                            <button className="text-gray-400 hover:text-blue-600" onClick={e => { e.stopPropagation(); onEdit(req); }} title={canEdit ? "Editar" : "Ver detalles"}>
+                                                {canEdit ? <MoreHorizontal size={16} /> : <Eye size={16} />}
                                             </button>
                                         </div>
                                     </td>

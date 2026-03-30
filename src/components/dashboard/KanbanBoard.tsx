@@ -25,6 +25,7 @@ import {
     useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useAuth } from '../../hooks/useAuth';
 
 interface KanbanBoardProps {
     requests: ITRequest[];
@@ -64,30 +65,34 @@ interface SortableItemProps {
 }
 
 const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ req, onEdit, onDelete, catalogosUrgencia, isOverlay }) => {
+    const { user, esAdministrador } = useAuth();
+    const canEdit = esAdministrador || req.creadorId === user?.id;
     const assignee = MOCK_USERS.find(u => u.id === req.assigneeId);
 
     return (
         <div
             onClick={() => onEdit(req)}
             className={`bg-white p-3 rounded-lg border border-slate-200 shadow-sm transition-all group select-none
-        ${isOverlay ? 'shadow-xl rotate-2 scale-105 cursor-grabbing' : 'hover:shadow-md cursor-grab active:cursor-grabbing'}
+        ${isOverlay ? 'shadow-xl rotate-2 scale-105 cursor-grabbing' : (canEdit ? 'hover:shadow-md cursor-grab active:cursor-grabbing' : 'hover:shadow-md cursor-pointer')}
       `}
         >
             <div className="flex justify-between items-start mb-2">
                 <span className="text-[10px] font-mono text-slate-400">{req.id}</span>
                 <div className="flex gap-1">
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm('¿Eliminar solicitud?')) {
-                                onDelete?.(req.id);
-                            }
-                        }}
-                        className="text-slate-400 hover:text-red-500 p-0.5 rounded transition-colors opacity-0 group-hover:opacity-100"
-                        title="Eliminar"
-                    >
-                        <AlertCircle size={14} />
-                    </button>
+                    {canEdit && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm('¿Eliminar solicitud?')) {
+                                    onDelete?.(req.id);
+                                }
+                            }}
+                            className="text-slate-400 hover:text-red-500 p-0.5 rounded transition-colors opacity-0 group-hover:opacity-100"
+                            title="Eliminar"
+                        >
+                            <AlertCircle size={14} />
+                        </button>
+                    )}
                     <span
                         className="text-[10px] px-2 py-0.5 rounded border font-medium"
                         style={getUrgencyStyle(req.urgency, catalogosUrgencia)}
@@ -130,6 +135,9 @@ const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ re
 };
 
 const SortableRequestItem: React.FC<SortableItemProps> = (props) => {
+    const { user, esAdministrador } = useAuth();
+    const canEdit = esAdministrador || props.req.creadorId === user?.id;
+
     const {
         attributes,
         listeners,
@@ -137,7 +145,11 @@ const SortableRequestItem: React.FC<SortableItemProps> = (props) => {
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: props.req.id, data: { type: 'Task', status: props.req.status } });
+    } = useSortable({
+        id: props.req.id,
+        data: { type: 'Task', status: props.req.status },
+        disabled: !canEdit // Disable dragging if user cannot edit
+    });
 
     const style = {
         transform: CSS.Translate.toString(transform),

@@ -43,6 +43,7 @@ export interface ITRequest {
     createdAt: string;
     dueDate?: string;
     externalId?: string; // Jira/ServiceNow ID
+    creadorId?: string;
     direccionSolicitante?: string;
 }
 

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../hooks/useAuth';
 import { useTareas } from '../../hooks/useTareas';
 import { Columna } from './Columna';
 import { TarjetaTarea } from './TarjetaTarea';
@@ -25,6 +26,7 @@ import {
 import { Tarea } from '../../lib/supabase/tipos-bd';
 
 export const TareasBoard: React.FC = () => {
+
     const {
         tareas,
         columnas,
@@ -36,7 +38,8 @@ export const TareasBoard: React.FC = () => {
         actualizarTarea,
         eliminarTarea,
         moverTarea,
-        duplicarTarea
+        duplicarTarea,
+        reordenarColumnas
     } = useTareas();
 
     const [activeId, setActiveId] = useState<string | null>(null);
@@ -57,8 +60,9 @@ export const TareasBoard: React.FC = () => {
     const tareasActivas = tareas.filter(t => t.estado === 'Activa');
     
     const [localTareas, setLocalTareas] = useState<Tarea[]>(tareasActivas);
+    const [localColumnas, setLocalColumnas] = useState(columnas);
     
-    // Filters State
+    // ...
     const [searchTerm, setSearchTerm] = useState('');
     const [urgencyFilter, setUrgencyFilter] = useState<string>('Todas');
 
@@ -72,6 +76,10 @@ export const TareasBoard: React.FC = () => {
         });
         setLocalTareas(filtered);
     }, [tareas, searchTerm, urgencyFilter]);
+
+    React.useEffect(() => {
+        setLocalColumnas(columnas);
+    }, [columnas]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -265,6 +273,17 @@ export const TareasBoard: React.FC = () => {
 
                 await moverTarea(originalTarea.id, nuevaColumnaId, nuevoOrden, optTareasFinal);
             }
+        } else if (active.data.current?.type === 'Columna') {
+            const activeIndex = localColumnas.findIndex(c => c.id === active.id);
+            const overIndex = localColumnas.findIndex(c => c.id === over.id);
+
+            if (activeIndex !== overIndex && activeIndex !== -1 && overIndex !== -1) {
+                const newCols = arrayMove(localColumnas, activeIndex, overIndex);
+                setLocalColumnas(newCols);
+                
+                // Enviar inmediatamente al backend
+                await reordenarColumnas(newCols.map((col: any, index: number) => ({ id: col.id, orden: index })));
+            }
         }
     };
 
@@ -282,6 +301,7 @@ export const TareasBoard: React.FC = () => {
                         className="w-full pl-4 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                     />
                 </div>
+
                 <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-slate-500">Filtrar por urgencia:</span>
                     <select
@@ -305,8 +325,8 @@ export const TareasBoard: React.FC = () => {
                 onDragEnd={handleDragEnd}
             >
                 <div className="flex h-full gap-4 overflow-x-auto pb-4 items-start px-2">
-                    <SortableContext items={columnas.map(c => c.id)} strategy={horizontalListSortingStrategy}>
-                        {columnas.map((col) => (
+                    <SortableContext items={localColumnas.map(c => c.id)} strategy={horizontalListSortingStrategy}>
+                        {localColumnas.map((col) => (
                             <Columna
                                 key={col.id}
                                 columna={col}

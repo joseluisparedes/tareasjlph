@@ -4,11 +4,15 @@ import { History, X, Save, MessageSquareMore, Send, Edit2, Trash2, Calendar } fr
 import { apuntesApi } from '../../lib/api/apuntes';
 import type { SolicitudApunte } from '../../lib/supabase/tipos-bd';
 
+import { useAuth } from '../../hooks/useAuth';
+
 interface NotesCellProps {
     requestId: string;
+    canEdit?: boolean;
 }
 
-export const NotesCell: React.FC<NotesCellProps> = ({ requestId }) => {
+export const NotesCell: React.FC<NotesCellProps> = ({ requestId, canEdit = true }) => {
+    const { perfil } = useAuth();
     const [apuntes, setApuntes] = useState<SolicitudApunte[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isOpen, setIsOpen] = useState(false);
@@ -92,7 +96,8 @@ export const NotesCell: React.FC<NotesCellProps> = ({ requestId }) => {
         if (!nuevoApunte.trim() || !requestId) return;
         setGuardandoApunte(true);
         try {
-            const apunte = await apuntesApi.crear(requestId, nuevoApunte, 'Usuario Actual');
+            const userName = perfil?.nombre_completo || 'Usuario Desconocido';
+            const apunte = await apuntesApi.crear(requestId, nuevoApunte, userName);
             setApuntes(prev => [apunte, ...prev]);
             setNuevoApunte('');
             window.dispatchEvent(new CustomEvent('apuntes-actualizados', { detail: { requestId, source: 'NotesCell' } }));
@@ -220,7 +225,7 @@ export const NotesCell: React.FC<NotesCellProps> = ({ requestId }) => {
                                             <span className="text-[9px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                                                 {apunte.creado_por || 'Sistema'}
                                             </span>
-                                            {editingApunteId !== apunte.id && (
+                                            {editingApunteId !== apunte.id && canEdit && (
                                                 <div className="opacity-0 group-hover/item:opacity-100 transition-opacity flex gap-1 bg-white pl-1">
                                                     <button type="button" onClick={(e) => { e.stopPropagation(); handleIniciarEdicion(apunte); }} className="text-blue-500 hover:text-blue-700 p-1 hover:bg-blue-50 rounded">
                                                         <Edit2 size={12} />
@@ -258,34 +263,36 @@ export const NotesCell: React.FC<NotesCellProps> = ({ requestId }) => {
                     </div>
 
                     {/* Footer / Input */}
-                    <div className="p-3 border-t border-slate-200 bg-white rounded-b-lg">
-                        <div className="flex items-end gap-2 relative">
-                            <textarea
-                                rows={2}
-                                className="flex-1 text-xs rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 p-2 pr-9 outline-none resize-none bg-slate-50 focus:bg-white transition-colors"
-                                placeholder="Nuevo apunte..."
-                                value={nuevoApunte}
-                                onChange={e => setNuevoApunte(e.target.value)}
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter' && !e.shiftKey) {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleGuardarApunte();
-                                    }
-                                }}
-                            />
-                            <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); handleGuardarApunte(); }}
-                                disabled={!nuevoApunte.trim() || guardandoApunte}
-                                className="absolute right-2 bottom-2 p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
-                                title="Enviar apunte"
-                            >
-                                <Send size={12} className={guardandoApunte ? 'opacity-0' : 'opacity-100'} />
-                                {guardandoApunte && <div className="absolute inset-0 flex items-center justify-center"><div className="w-2 h-2 border-2 border-white/30 border-t-white rounded-full animate-spin"></div></div>}
-                            </button>
+                    {canEdit && (
+                        <div className="p-3 border-t border-slate-200 bg-white rounded-b-lg">
+                            <div className="flex items-end gap-2 relative">
+                                <textarea
+                                    rows={2}
+                                    className="flex-1 text-xs rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 p-2 pr-9 outline-none resize-none bg-slate-50 focus:bg-white transition-colors"
+                                    placeholder="Nuevo apunte..."
+                                    value={nuevoApunte}
+                                    onChange={e => setNuevoApunte(e.target.value)}
+                                    onKeyDown={e => {
+                                        if (e.key === 'Enter' && !e.shiftKey) {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleGuardarApunte();
+                                        }
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleGuardarApunte(); }}
+                                    disabled={!nuevoApunte.trim() || guardandoApunte}
+                                    className="absolute right-2 bottom-2 p-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+                                    title="Enviar apunte"
+                                >
+                                    <Send size={12} className={guardandoApunte ? 'opacity-0' : 'opacity-100'} />
+                                    {guardandoApunte && <div className="absolute inset-0 flex items-center justify-center"><div className="w-2 h-2 border-2 border-white/30 border-t-white rounded-full animate-spin"></div></div>}
+                                </button>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </div>, document.body
             )}
         </div>
