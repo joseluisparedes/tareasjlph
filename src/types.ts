@@ -36,7 +36,8 @@ export type CatalogType =
     | 'tipo_tarea'
     | 'complejidad'
     | 'dominios'
-    | 'ingresado_gestion_demanda';
+    | 'ingresado_gestion_demanda'
+    | 'tipo_actividad_calendario';
 
 export interface User {
     id: string;
@@ -97,7 +98,7 @@ export interface CatalogoConfig {
     modo_visualizacion: 'desplegable' | 'cuadros';
 }
 
-export type ViewMode = 'Dashboard' | 'Admin' | 'Reports' | 'Integrations' | 'Tareas';
+export type ViewMode = 'Dashboard' | 'Admin' | 'Reports' | 'Integrations' | 'Tareas' | 'Calendario';
 export type DashboardView = 'Kanban' | 'Table';
 
 export interface FilterState {
@@ -117,4 +118,17 @@ export interface SavedFilter {
     id: string;
     name: string;
     config: FilterState;
+}
+
+export interface ActividadCalendario {
+    id: string;
+    descripcion: string;
+    tipo_actividad: string;
+    fecha_inicio: string;
+    fecha_fin: string;
+    hora_inicio?: string | null;
+    hora_fin?: string | null;
+    creado_por: string;
+    creado_por_nombre?: string;
+    fecha_creacion?: string;
 }

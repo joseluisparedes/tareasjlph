@@ -36,6 +36,7 @@ const CATALOG_SECTIONS: { tipo: CatalogType; label: string }[] = [
     { tipo: 'tipo_tarea', label: 'Tipo de Tarea' },
     { tipo: 'complejidad', label: 'Complejidad' },
     { tipo: 'ingresado_gestion_demanda', label: 'Ingresado en Gestión de la Demanda' },
+    { tipo: 'tipo_actividad_calendario', label: 'Tipo de Actividad Calendario' },
 ];
 
 // ─── Componente Sortable para un Item de Catálogo ────────────────────────────
@@ -83,7 +84,7 @@ const SortableCatalogItemRow: React.FC<{
                             <GripVertical size={14} />
                         </button>
                         <div className={`w-1.5 h-1.5 rounded-full ${item.esta_activo ? 'bg-green-500' : 'bg-slate-300'}`} />
-                        {tipo === 'urgencia' && (
+                        {(tipo === 'urgencia' || tipo === 'tipo_actividad_calendario') && (
                             <label className="cursor-pointer" title="Cambiar color">
                                 <div className="w-5 h-5 rounded border border-slate-300 shadow-sm flex-shrink-0"
                                     style={{ backgroundColor: item.color || '#94a3b8' }} />

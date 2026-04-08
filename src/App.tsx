@@ -7,6 +7,7 @@ import { Reports } from './components/dashboard/Reports';
 import { BulkOperations } from './components/dashboard/BulkOperations';
 import { AuthPage } from './components/auth/AuthPage';
 import { TareasModule } from './components/tareas/TareasModule';
+import { CalendarioModule } from './components/calendario/CalendarioModule';
 import { ITRequest, ViewMode, CatalogItem, RequestType, Urgency, Status } from './types';
 import { useSolicitudes } from './hooks/useSolicitudes';
 import { useDominios } from './hooks/useDominios';
@@ -380,6 +381,7 @@ export default function App() {
                         <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
                             {vistaSegura === 'Dashboard' && 'Tablero Unificado de Tareas'}
                             {vistaSegura === 'Tareas' && 'Gestor de Tareas Kanban'}
+                            {vistaSegura === 'Calendario' && 'Calendario de Actividades Críticas'}
                             {vistaSegura === 'Admin' && 'Administración del Sistema'}
                             {vistaSegura === 'Reports' && 'Reportes y Analítica'}
                             {vistaSegura === 'Integrations' && 'Importación y Exportación'}
@@ -391,6 +393,7 @@ export default function App() {
                                     : `Gestiona tu portafolio TI. ${requests.length} solicitudes activas.`
                             )}
                             {vistaSegura === 'Tareas' && 'Agiliza tus actividades con tarjetas interactivas.'}
+                            {vistaSegura === 'Calendario' && 'Visualiza y gestiona eventos y actividades clave del equipo.'}
                             {vistaSegura === 'Admin' && 'Configurar catálogos y usuarios.'}
                             {vistaSegura === 'Reports' && 'Visualizar carga de trabajo y rendimiento.'}
                             {vistaSegura === 'Integrations' && 'Carga masiva y descarga de reportes.'}
@@ -462,6 +465,9 @@ export default function App() {
                         )}
                         {vistaSegura === 'Tareas' && (
                             <TareasModule />
+                        )}
+                        {vistaSegura === 'Calendario' && (
+                            <CalendarioModule />
                         )}
                         {vistaSegura === 'Admin' && esAdministrador && (
                             <AdminPanel

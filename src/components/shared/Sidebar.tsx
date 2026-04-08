@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Settings, BarChart3, Link as LinkIcon, ChevronLeft, Menu, CheckSquare } from 'lucide-react';
+import { LayoutDashboard, Settings, BarChart3, Link as LinkIcon, ChevronLeft, Menu, CheckSquare, Calendar } from 'lucide-react';
 import { ViewMode } from '../../types';
 
 interface SidebarProps {
@@ -14,6 +14,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
     const todosLosItems: { view: ViewMode; label: string; icon: React.ReactNode; soloAdmin?: boolean }[] = [
         { view: 'Dashboard', label: 'Tablero', icon: <LayoutDashboard size={20} /> },
         { view: 'Tareas', label: 'Tareas', icon: <CheckSquare size={20} /> },
+        { view: 'Calendario', label: 'Calendario', icon: <Calendar size={20} /> },
         { view: 'Reports', label: 'Reportes', icon: <BarChart3 size={20} /> },
         { view: 'Integrations', label: 'Integraciones', icon: <LinkIcon size={20} /> },
         { view: 'Admin', label: 'Admin', icon: <Settings size={20} />, soloAdmin: true },
