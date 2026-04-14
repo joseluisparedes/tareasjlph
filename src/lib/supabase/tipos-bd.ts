@@ -88,6 +88,7 @@ export interface Tarea {
     columna_id: string | null;
     estado: 'Activa' | 'Terminada';
     urgencia: 'Verde' | 'Amarillo' | 'Rojo';
+    origen: 'manual' | 'integracion';
     orden: number;
     creado_por: string | null;
     fecha_creacion: string;

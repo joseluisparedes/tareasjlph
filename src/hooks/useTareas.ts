@@ -144,6 +144,7 @@ export function useTareas() {
             columna_id,
             estado: 'Activa',
             urgencia,
+            origen: 'manual',
             orden,
             creado_por: user?.id || null,
             fecha_creacion: new Date().toISOString(),
@@ -160,6 +161,7 @@ export function useTareas() {
                 columna_id,
                 estado: 'Activa',
                 urgencia,
+                origen: 'manual',
                 orden,
                 creado_por: user?.id
             }])
@@ -194,12 +196,18 @@ export function useTareas() {
     };
 
     const eliminarTarea = async (id: string) => {
+        // Actualización optimista: removemos de la UI inmediatamente
+        setTareas(prev => sortTareas(prev.filter(t => t.id !== id)));
+        
         const { error } = await supabase
             .from('tareas')
             .delete()
             .eq('id', id);
 
-        if (error) throw error;
+        if (error) {
+            cargarDatos(); // Revertir si hay error
+            throw error;
+        }
     };
 
     const moverTarea = async (

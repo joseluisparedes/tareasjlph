@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useTareas } from '../../hooks/useTareas';
 import { Columna } from './Columna';
 import { TarjetaTarea } from './TarjetaTarea';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Mail, Trash2 } from 'lucide-react';
 import {
     DndContext,
     closestCorners,
@@ -56,6 +56,9 @@ export const TareasBoard: React.FC = () => {
     
     const [isCreateTareaModalOpen, setCreateTareaModalOpen] = useState(false);
     const [targetColId, setTargetColId] = useState<string | null>(null);
+
+    // Confirmation Modals State
+    const [isDeleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
 
     const tareasActivas = tareas.filter(t => t.estado === 'Activa');
     
@@ -121,9 +124,14 @@ export const TareasBoard: React.FC = () => {
         setEditModalOpen(true);
     };
 
-    const handleDeleteTarea = async () => {
-        if (editingTarea && window.confirm('¿Eliminar esta tarea definitivamente?')) {
+    const handleDeleteTarea = () => {
+        setDeleteConfirmModalOpen(true);
+    };
+
+    const confirmDeleteTarea = async () => {
+        if (editingTarea) {
             await eliminarTarea(editingTarea.id);
+            setDeleteConfirmModalOpen(false);
             setEditModalOpen(false);
         }
     };
@@ -359,7 +367,14 @@ export const TareasBoard: React.FC = () => {
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
                         <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center flex-shrink-0">
-                            <h3 className="font-semibold text-slate-800">Editar Tarea</h3>
+                            <div className="flex items-center gap-3">
+                                <h3 className="font-semibold text-slate-800">Editar Tarea</h3>
+                                {editingTarea?.origen === 'integracion' && (
+                                    <span className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-indigo-100 text-indigo-700 flex items-center gap-1" title="Automático desde Outlook">
+                                        <Mail size={12} /> Integración Outlook
+                                    </span>
+                                )}
+                            </div>
                             <button onClick={() => setEditModalOpen(false)} className="text-slate-400 hover:text-slate-600">&times;</button>
                         </div>
                         <div className="p-6 space-y-4 overflow-y-auto">
@@ -462,6 +477,37 @@ export const TareasBoard: React.FC = () => {
                         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 flex-shrink-0">
                             <button onClick={() => setCreateTareaModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-lg transition-colors">Cancelar</button>
                             <button onClick={submitCreateTarea} disabled={!editForm.titulo.trim()} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors shadow-sm">Crear Tarea</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Confirmar Eliminación */}
+            {isDeleteConfirmModalOpen && (
+                <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="p-6 text-center">
+                            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                                <Trash2 className="text-red-600" size={24} />
+                            </div>
+                            <h3 className="font-bold text-slate-800 text-lg mb-2">¿Eliminar tarea?</h3>
+                            <p className="text-slate-500 text-sm mb-6">
+                                Esta acción no se puede deshacer. ¿Seguro que deseas eliminar esta tarea definitivamente?
+                            </p>
+                            <div className="flex gap-3 justify-center">
+                                <button 
+                                    onClick={() => setDeleteConfirmModalOpen(false)} 
+                                    className="px-4 py-2 font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors w-full"
+                                >
+                                    Cancelar
+                                </button>
+                                <button 
+                                    onClick={confirmDeleteTarea} 
+                                    className="px-4 py-2 font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors w-full shadow-sm"
+                                >
+                                    Sí, eliminar
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

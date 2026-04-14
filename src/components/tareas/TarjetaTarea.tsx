@@ -2,7 +2,7 @@ import React from 'react';
 import { Tarea } from '../../lib/supabase/tipos-bd';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { CheckCircle2, Copy } from 'lucide-react';
+import { CheckCircle2, Copy, Mail } from 'lucide-react';
 
 interface TarjetaTareaProps {
     tarea: Tarea;
@@ -48,11 +48,16 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ tarea, onEdit, onFin
                 <div 
                     {...attributes} 
                     {...listeners} 
-                    className="flex-1"
+                    className="flex-1 flex flex-wrap items-center gap-2"
                 >
                     <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${colors.bg} ${colors.text}`}>
                         {colors.label}
                     </span>
+                    {tarea.origen === 'integracion' && (
+                        <span className="text-[10px] px-2 py-0.5 rounded font-medium bg-indigo-100 text-indigo-700 flex items-center gap-1" title="Creada por integración (API)">
+                            <Mail size={10} /> Integración
+                        </span>
+                    )}
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-white/80 rounded-md backdrop-blur-sm">
                     {onDuplicate && (
