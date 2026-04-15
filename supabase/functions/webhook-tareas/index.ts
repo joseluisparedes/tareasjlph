@@ -20,11 +20,74 @@ serve(async (req) => {
 
     // Leemos el payload enviado por Power Automate
     const body = await req.json()
-    const { titulo, descripcion, columna_id } = body;
+    let { titulo, descripcion, columna_id } = body;
 
     if (!titulo || !columna_id) {
        return new Response(JSON.stringify({ error: 'Falta título o el ID de la columna' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
+
+    // --- PROCESAMIENTO CON IA (GEMINI) ---
+    if (descripcion && descripcion.length > 0) {
+      const limpiarHTML = (texto: string) => {
+        return texto
+          .replace(/<style[^>]*>.*<\/style>/gms, '')
+          .replace(/<script[^>]*>.*<\/script>/gms, '')
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/&nbsp;/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      const descripcionLimpia = limpiarHTML(descripcion);
+
+      try {
+        const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
+        if (GEMINI_API_KEY && descripcionLimpia.length > 5) {
+          const textoParaResumir = descripcionLimpia.substring(0, 30000);
+          
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{
+                  parts: [{
+                    text: `Actúa como un asistente de gestión de proyectos. El siguiente texto es un correo electrónico. Genera un resumen ejecutivo de máximo 200 caracteres enfocándote en la solicitud principal o acción requerida. No uses frases como 'El resumen es'. Texto: ${textoParaResumir}`
+                  }]
+                }],
+                generationConfig: {
+                  maxOutputTokens: 150,
+                  temperature: 0.1,
+                }
+              })
+            }
+          );
+
+          if (response.ok) {
+            const dataIA = await response.json();
+            const resumenIA = dataIA.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (resumenIA) {
+              descripcion = resumenIA.trim().substring(0, 200);
+            } else {
+              // Si la IA responde ok pero sin texto (raro), usamos el fallback inteligente
+              descripcion = descripcionLimpia.length <= 200 ? descripcionLimpia : descripcionLimpia.substring(0, 197) + "...";
+            }
+          } else {
+            console.warn("Fallo en Gemini API (posible cuota). Usando fallback inteligente.");
+            // Si el mensaje ya es corto, lo dejamos igual. Solo cortamos si es largo.
+            descripcion = descripcionLimpia.length <= 200 ? descripcionLimpia : descripcionLimpia.substring(0, 197) + "...";
+          }
+        } else {
+          // Sin clave: fallback inteligente
+          descripcion = descripcionLimpia.length <= 200 ? descripcionLimpia : descripcionLimpia.substring(0, 197) + "...";
+        }
+      } catch (errorIA) {
+        console.error("Error IA:", errorIA);
+        descripcion = descripcionLimpia.length <= 200 ? descripcionLimpia : descripcionLimpia.substring(0, 197) + "...";
+      }
+    }
+    // -------------------------------------
 
     // Creamos un cliente de Supabase usando el Service Role Key (para tener permisos de insertar sin un usuario logueado)
     // Las variables de entorno process.env en Deno para Supabase Edge Functions son automáticas
@@ -42,15 +105,15 @@ serve(async (req) => {
 
     const propietario = columnaData ? columnaData.creado_por : null;
 
-    // Calculamos el orden al final de la columna
+    // Calculamos el orden para que aparezca al inicio de la columna (top)
     const { data: tareasExistentes } = await supabaseClient
       .from('tareas')
       .select('orden')
       .eq('columna_id', columna_id)
-      .order('orden', { ascending: false })
+      .order('orden', { ascending: true }) // Buscamos el mínimo
       .limit(1)
 
-    const nuevoOrden = tareasExistentes && tareasExistentes.length > 0 ? tareasExistentes[0].orden + 1 : 0;
+    const nuevoOrden = tareasExistentes && tareasExistentes.length > 0 ? tareasExistentes[0].orden - 1 : 0;
 
     // Insertamos la tarea
     const nuevaTarea = {
