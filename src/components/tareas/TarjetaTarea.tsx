@@ -2,13 +2,14 @@ import React from 'react';
 import { Tarea } from '../../lib/supabase/tipos-bd';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { CheckCircle2, Copy, Mail } from 'lucide-react';
+import { CheckCircle2, Copy, Mail, FileText } from 'lucide-react';
 
 interface TarjetaTareaProps {
     tarea: Tarea;
     onEdit?: (tarea: Tarea) => void;
     onFinalize: (id: string) => void;
     onDuplicate?: (tarea: Tarea) => void;
+    onRegisterInitiative?: (tarea: Tarea) => void;
     isOverlay?: boolean;
 }
 
@@ -18,7 +19,7 @@ const urgenciaColors = {
     'Rojo': { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200', label: 'Alto' }
 } as const;
 
-export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ tarea, onEdit, onFinalize, onDuplicate, isOverlay }) => {
+export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ tarea, onEdit, onFinalize, onDuplicate, onRegisterInitiative, isOverlay }) => {
     const {
         attributes,
         listeners,
@@ -58,6 +59,11 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ tarea, onEdit, onFin
                             <Mail size={10} /> Integración
                         </span>
                     )}
+                    {tarea.iniciativa_id && (
+                        <span className="text-[10px] px-2 py-0.5 rounded font-medium bg-teal-100 text-teal-700 flex items-center gap-1" title="Iniciativa Vinculada">
+                            <FileText size={10} /> Iniciativa vinculada
+                        </span>
+                    )}
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-white/80 rounded-md backdrop-blur-sm">
                     {onDuplicate && (
@@ -70,6 +76,18 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ tarea, onEdit, onFin
                             title="Duplicar tarea"
                         >
                             <Copy size={14} />
+                        </button>
+                    )}
+                    {onRegisterInitiative && !tarea.iniciativa_id && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRegisterInitiative(tarea);
+                            }}
+                            className="text-slate-400 hover:text-teal-600 p-1.5 rounded-md transition-colors hover:bg-teal-50"
+                            title="Registrar Iniciativa"
+                        >
+                            <FileText size={14} />
                         </button>
                     )}
                     <button

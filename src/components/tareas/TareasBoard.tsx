@@ -3,7 +3,13 @@ import { useAuth } from '../../hooks/useAuth';
 import { useTareas } from '../../hooks/useTareas';
 import { Columna } from './Columna';
 import { TarjetaTarea } from './TarjetaTarea';
-import { Plus, Loader2, Mail, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Mail, Trash2, FileText, Eye } from 'lucide-react';
+import { RequestModal } from '../dashboard/RequestModal';
+import { useCatalogos } from '../../hooks/useCatalogos';
+import { useDominios } from '../../hooks/useDominios';
+import { useSolicitudes } from '../../hooks/useSolicitudes';
+import { useCatalogoConfig } from '../../hooks/useCatalogoConfig';
+import { ITRequest, Status } from '../../types';
 import {
     DndContext,
     closestCorners,
@@ -41,6 +47,102 @@ export const TareasBoard: React.FC = () => {
         duplicarTarea,
         reordenarColumnas
     } = useTareas();
+
+    const { catalogos } = useCatalogos();
+    const { dominios } = useDominios();
+    const { crearSolicitud, solicitudes } = useSolicitudes();
+    const { getModo } = useCatalogoConfig();
+    const { user } = useAuth();
+
+    const domainsForModal = dominios.map(d => ({ id: d.id, name: d.nombre, isActive: d.esta_activo }));
+
+    const [isInitiativeModalOpen, setInitiativeModalOpen] = useState(false);
+    const [initiativeTaskContext, setInitiativeTaskContext] = useState<Tarea | null>(null);
+    const [initiativePrefill, setInitiativePrefill] = useState<ITRequest | null>(null);
+
+    const handleRegisterInitiative = (tarea: Tarea) => {
+        setInitiativeTaskContext(tarea);
+        
+        let reqUrgency: any = 'Media';
+        if (tarea.urgencia === 'Rojo') reqUrgency = 'Alta';
+        if (tarea.urgencia === 'Verde') reqUrgency = 'Baja';
+
+        setInitiativePrefill({
+            title: tarea.titulo,
+            description: tarea.descripcion || '',
+            urgency: reqUrgency,
+            type: 'Nuevo Pedido' as any,
+            status: 'Pendiente de estimar' as Status
+        } as ITRequest);
+        setInitiativeModalOpen(true);
+    };
+
+    const handleSaveInitiative = async (req: ITRequest) => {
+        if (!initiativeTaskContext || !user) return;
+        
+        const dominioId = dominios.find(d => d.nombre === req.domain)?.id ?? dominios[0]?.id;
+        
+        const datos: any = {
+            titulo: req.title,
+            descripcion: req.description || '',
+            tipo_solicitud: req.type,
+            dominio_id: dominioId,
+            solicitante: req.requester,
+            urgencia: req.urgency,
+            estado: req.status,
+            asignado_a: req.assigneeId || null,
+            creado_por: user.id,
+            prioridad: req.priority || null,
+            tarea_sn: req.tareaSN || null,
+            ticket_rit: req.ticketRIT || null,
+            fecha_inicio: req.fechaInicio || null,
+            fecha_fin: req.fechaFin || null,
+            direccion_solicitante: req.direccionSolicitante || null,
+            brm: req.brm || null,
+            institucion: req.institucion || null,
+            tipo_tarea: req.tipoTarea || null,
+            complejidad: req.complejidad || null,
+            ingresado_gestion_demanda: req.ingresadoGestionDemanda || null,
+        };
+
+        const nueva = await crearSolicitud(datos);
+        await actualizarTarea(initiativeTaskContext.id, { iniciativa_id: nueva.id });
+        setInitiativeModalOpen(false);
+    };
+
+    const handleViewInitiative = (iniciativaId: string) => {
+        const s = solicitudes.find(sol => sol.id === iniciativaId);
+        if (s) {
+            const reqAsITRequest: ITRequest = {
+                id: s.id,
+                title: s.titulo,
+                description: s.descripcion,
+                type: s.tipo_solicitud as any,
+                domain: dominios.find(d => d.id === s.dominio_id)?.nombre || '',
+                requester: s.solicitante,
+                urgency: s.urgencia as any,
+                status: s.estado as any,
+                assigneeId: s.asignado_a,
+                createdAt: s.fecha_creacion,
+                externalId: s.id_externo || undefined,
+                creadorId: s.creado_por,
+                priority: s.prioridad || undefined,
+                tareaSN: s.tarea_sn || undefined,
+                ticketRIT: s.ticket_rit || undefined,
+                fechaInicio: s.fecha_inicio || undefined,
+                fechaFin: s.fecha_fin || undefined,
+                direccionSolicitante: s.direccion_solicitante || undefined,
+                brm: s.brm || undefined,
+                institucion: s.institucion || undefined,
+                tipoTarea: s.tipo_tarea || undefined,
+                complejidad: s.complejidad || undefined,
+                ingresadoGestionDemanda: s.ingresado_gestion_demanda || undefined,
+            };
+            setInitiativePrefill(reqAsITRequest);
+            setInitiativeTaskContext(null); // Just view mode
+            setInitiativeModalOpen(true);
+        }
+    };
 
     const [activeId, setActiveId] = useState<string | null>(null);
     const [activeType, setActiveType] = useState<'Tarea' | 'Columna' | null>(null);
@@ -345,6 +447,7 @@ export const TareasBoard: React.FC = () => {
                                 onAddTarea={handleAddTarea}
                                 onEditTarea={abrirEditModal}
                                 onDuplicateTarea={duplicarTarea}
+                                onRegisterInitiative={handleRegisterInitiative}
                             />
                         ))}
                     </SortableContext>
@@ -399,6 +502,36 @@ export const TareasBoard: React.FC = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-2">Urgencia</label>
                                 <UrgencyToggle selected={editForm.urgencia} onChange={(u) => setEditForm({...editForm, urgencia: u})} />
                             </div>
+
+                            {/* Initiative Section */}
+                            {editingTarea?.iniciativa_id ? (
+                                <div className="mt-4 p-3 bg-teal-50 border border-teal-100 rounded-lg flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-teal-800">
+                                        <FileText size={16} />
+                                        <span className="text-sm font-medium">Iniciativa Vinculada</span>
+                                    </div>
+                                    <button 
+                                        onClick={() => handleViewInitiative(editingTarea.iniciativa_id!)}
+                                        className="text-xs flex items-center gap-1 bg-white border border-teal-200 text-teal-700 px-2.5 py-1.5 rounded-md hover:bg-teal-100 transition-colors font-medium shadow-sm"
+                                    >
+                                        <Eye size={12} /> Ver Iniciativa
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="mt-4 p-3 bg-slate-50 border border-slate-200 rounded-lg flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-slate-600">
+                                        <FileText size={16} />
+                                        <span className="text-sm">Sin iniciativa</span>
+                                    </div>
+                                    <button 
+                                        disabled={!editingTarea}
+                                        onClick={() => editingTarea && handleRegisterInitiative(editingTarea)}
+                                        className="text-xs flex items-center gap-1 bg-white border border-slate-300 text-slate-700 px-2.5 py-1.5 rounded-md hover:bg-slate-100 transition-colors font-medium shadow-sm"
+                                    >
+                                        <Plus size={12} /> Registrar
+                                    </button>
+                                </div>
+                            )}
                         </div>
                         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center flex-shrink-0">
                             <button onClick={handleDeleteTarea} className="text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors">
@@ -512,6 +645,16 @@ export const TareasBoard: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <RequestModal
+                isOpen={isInitiativeModalOpen}
+                onClose={() => setInitiativeModalOpen(false)}
+                request={initiativePrefill}
+                onSave={handleSaveInitiative}
+                domains={domainsForModal}
+                catalogos={catalogos}
+                getModo={getModo}
+            />
         </div>
     );
 };

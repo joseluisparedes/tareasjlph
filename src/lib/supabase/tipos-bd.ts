@@ -91,6 +91,7 @@ export interface Tarea {
     origen: 'manual' | 'integracion';
     orden: number;
     creado_por: string | null;
+    iniciativa_id: string | null;
     fecha_creacion: string;
     fecha_actualizacion: string;
 }

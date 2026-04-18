@@ -15,6 +15,7 @@ interface ColumnaProps {
     onAddTarea: (columnaId: string) => void;
     onEditTarea: (tarea: Tarea) => void;
     onDuplicateTarea: (tarea: Tarea) => void;
+    onRegisterInitiative?: (tarea: Tarea) => void;
 }
 
 export const Columna: React.FC<ColumnaProps> = ({ 
@@ -25,7 +26,8 @@ export const Columna: React.FC<ColumnaProps> = ({
     onDeleteColumna,
     onAddTarea,
     onEditTarea,
-    onDuplicateTarea
+    onDuplicateTarea,
+    onRegisterInitiative
 }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(columna.nombre);
@@ -37,8 +39,7 @@ export const Columna: React.FC<ColumnaProps> = ({
 
     const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
         id: columna.id,
-        data: { type: 'Columna', status: columna.id },
-        disabled: isProtected // Bloquear drag and drop si es integración
+        data: { type: 'Columna', status: columna.id }
     });
 
     const style = {
@@ -62,7 +63,7 @@ export const Columna: React.FC<ColumnaProps> = ({
         >
             <div
                 {...attributes}
-                {...listeners}
+                {...(isProtected ? {} : listeners)}
                 className={`p-3 border-b rounded-t-xl flex justify-between items-center group ${isProtected ? 'bg-indigo-100/80 border-indigo-200 cursor-default' : 'bg-slate-50 border-slate-200 cursor-grab active:cursor-grabbing'}`}
             >
                 {isEditing ? (
@@ -130,6 +131,7 @@ export const Columna: React.FC<ColumnaProps> = ({
                             onFinalize={onFinalizeTarea}
                             onEdit={onEditTarea}
                             onDuplicate={onDuplicateTarea}
+                            onRegisterInitiative={onRegisterInitiative}
                         />
                     ))}
                 </SortableContext>

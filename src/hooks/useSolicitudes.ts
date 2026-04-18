@@ -31,29 +31,42 @@ export function useSolicitudes() {
 
     useEffect(() => {
         cargar();
+        
+        const handleSync = () => {
+             cargar();
+        };
+        
+        window.addEventListener('solicitudes-sync', handleSync);
+        return () => window.removeEventListener('solicitudes-sync', handleSync);
     }, [cargar]);
+
+    const notifySync = () => window.dispatchEvent(new CustomEvent('solicitudes-sync'));
 
     const crearSolicitud = async (solicitud: Omit<Solicitud, 'id' | 'fecha_creacion' | 'fecha_actualizacion'>) => {
         const nueva = await solicitudesApi.crear(solicitud);
         setSolicitudes(prev => [nueva, ...prev]);
+        notifySync();
         return nueva;
     };
 
     const actualizarSolicitud = async (id: string, cambios: Partial<Solicitud>) => {
         const actualizada = await solicitudesApi.actualizar(id, cambios);
         setSolicitudes(prev => prev.map(s => s.id === id ? actualizada : s));
+        notifySync();
         return actualizada;
     };
 
     const cambiarEstado = async (id: string, estado: Solicitud['estado']) => {
         const actualizada = await solicitudesApi.cambiarEstado(id, estado);
         setSolicitudes(prev => prev.map(s => s.id === id ? actualizada : s));
+        notifySync();
         return actualizada;
     };
 
     const eliminarSolicitud = async (id: string) => {
         await solicitudesApi.eliminar(id);
         setSolicitudes(prev => prev.filter(s => s.id !== id));
+        notifySync();
     };
 
     return {
