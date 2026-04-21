@@ -199,7 +199,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
         }
     };
 
-    const pendingRequestsForAI = useMemo(() => requests.filter(req => req.status !== 'Cerrado'), [requests]);
+    const availableStatuses = useMemo(() => {
+        const unique = Array.from(new Set(filteredRequests.map(r => r.status)));
+        const statusOrder = catalogos
+            .filter(c => c.categoria === 'status')
+            .map(c => c.valor);
+        
+        return unique.sort((a, b) => {
+            const indexA = statusOrder.indexOf(a);
+            const indexB = statusOrder.indexOf(b);
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
+        });
+    }, [filteredRequests, catalogos]);
 
     const handleProcessAIAction = async (item: ITRequest, actionResult: any) => {
         if (actionResult.accion === 'actualizar') {
@@ -218,12 +231,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                 isOpen={isAIModalOpen}
                 onClose={() => setIsAIModalOpen(false)}
                 tipo="iniciativa"
-                items={pendingRequestsForAI.map(req => ({
+                items={filteredRequests.map(req => ({
                     ...req,
                     titulo: req.title,
                     descripcion: req.description,
                     estado: req.status
                 }))}
+                opcionesFiltrado={availableStatuses}
+                onOpenDetails={onEditRequest}
                 onProcessAction={handleProcessAIAction}
             />
             {/* Action Bar */}

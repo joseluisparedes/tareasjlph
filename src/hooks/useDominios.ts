@@ -11,21 +11,21 @@ export function useDominios() {
 
     const userId = user?.id;
 
-    const cargar = useCallback(async () => {
+    const cargar = useCallback(async (silencioso = false) => {
         if (!userId) {
             setDominios([]);
             setCargando(false);
             return;
         }
         try {
-            setCargando(true);
+            if (!silencioso) setCargando(true);
             setError(null);
             const datos = await dominiosApi.obtenerTodos();
             setDominios(datos);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al cargar dominios');
         } finally {
-            setCargando(false);
+            if (!silencioso) setCargando(false);
         }
     }, [userId]);
 

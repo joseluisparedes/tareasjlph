@@ -11,21 +11,21 @@ export function useSolicitudes() {
 
     const userId = user?.id;
 
-    const cargar = useCallback(async () => {
+    const cargar = useCallback(async (silencioso = false) => {
         if (!userId) {
             setSolicitudes([]);
             setCargando(false);
             return;
         }
         try {
-            setCargando(true);
+            if (!silencioso) setCargando(true);
             setError(null);
             const datos = await solicitudesApi.obtenerTodas();
             setSolicitudes(datos);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al cargar solicitudes');
         } finally {
-            setCargando(false);
+            if (!silencioso) setCargando(false);
         }
     }, [userId]);
 
@@ -33,7 +33,7 @@ export function useSolicitudes() {
         cargar();
         
         const handleSync = () => {
-             cargar();
+             cargar(true); // Carga silenciosa en sincronización
         };
         
         window.addEventListener('solicitudes-sync', handleSync);

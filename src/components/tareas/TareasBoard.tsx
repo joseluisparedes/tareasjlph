@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTareas } from '../../hooks/useTareas';
 import { Columna } from './Columna';
@@ -184,9 +184,16 @@ export const TareasBoard: React.FC = () => {
         setLocalTareas(filtered);
     }, [tareas, searchTerm, urgencyFilter]);
 
-    React.useEffect(() => {
+    useEffect(() => {
         setLocalColumnas(columnas);
     }, [columnas]);
+
+    const allAvailableVerticals = React.useMemo(() => {
+        const uniqueColIds = Array.from(new Set(localTareas.map(t => t.columna_id)));
+        return columnas
+            .filter(c => uniqueColIds.includes(c.id))
+            .map(c => c.nombre);
+    }, [columnas, localTareas]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -434,7 +441,12 @@ export const TareasBoard: React.FC = () => {
                 isOpen={isAIModalOpen}
                 onClose={() => setIsAIModalOpen(false)}
                 tipo="tarea"
-                items={localTareas.map(t => ({ ...t, nombre_columna: columnas.find(c => c.id === t.columna_id)?.nombre }))}
+                items={localTareas.map(t => ({ 
+                    ...t, 
+                    nombre_columna: columnas.find(c => c.id === t.columna_id)?.nombre 
+                }))}
+                opcionesFiltrado={allAvailableVerticals}
+                onOpenDetails={abrirEditModal}
                 onProcessAction={handleProcessAIAction}
             />
             

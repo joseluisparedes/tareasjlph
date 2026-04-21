@@ -19,9 +19,9 @@ export function useTareas() {
     const [columnas, setColumnas] = useState<TareaColumna[]>([]);
     const [cargando, setCargando] = useState(true);
 
-    const cargarDatos = async () => {
+    const cargarDatos = async (silencioso = false) => {
         try {
-            setCargando(true);
+            if (!silencioso) setCargando(true);
             let tareasQuery = supabase.from('tareas').select('*').order('orden', { ascending: true });
             let colsQuery = supabase.from('tareas_columnas').select('*').order('orden', { ascending: true });
 
@@ -43,7 +43,7 @@ export function useTareas() {
         } catch (error) {
             console.error('Error al cargar tareas:', error);
         } finally {
-            setCargando(false);
+            if (!silencioso) setCargando(false);
         }
     };
 
@@ -54,14 +54,14 @@ export function useTareas() {
         const subscriptionTareas = supabase
             .channel('tareas_cambios')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tareas' }, () => {
-                cargarDatos();
+                cargarDatos(true); // Carga silenciosa para actualizaciones externas
             })
             .subscribe();
 
         const subscriptionColumnas = supabase
             .channel('columnas_cambios')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'tareas_columnas' }, () => {
-                cargarDatos();
+                cargarDatos(true); // Carga silenciosa para actualizaciones externas
             })
             .subscribe();
 

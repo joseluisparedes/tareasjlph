@@ -11,21 +11,21 @@ export function useCatalogos() {
 
     const userId = user?.id;
 
-    const cargar = useCallback(async () => {
+    const cargar = useCallback(async (silencioso = false) => {
         if (!userId) {
             setCatalogos([]);
             setCargando(false);
             return;
         }
         try {
-            setCargando(true);
+            if (!silencioso) setCargando(true);
             setError(null);
             const datos = await catalogosApi.obtenerTodos();
             setCatalogos(datos);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al cargar catálogos');
         } finally {
-            setCargando(false);
+            if (!silencioso) setCargando(false);
         }
     }, [userId]);
 
