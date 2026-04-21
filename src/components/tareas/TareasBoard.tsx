@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useTareas } from '../../hooks/useTareas';
 import { Columna } from './Columna';
 import { TarjetaTarea } from './TarjetaTarea';
-import { Plus, Loader2, Mail, Trash2, FileText, Eye } from 'lucide-react';
+import { Plus, Loader2, Mail, Trash2, FileText, Eye, Sparkles } from 'lucide-react';
 import { RequestModal } from '../dashboard/RequestModal';
 import { useCatalogos } from '../../hooks/useCatalogos';
 import { useDominios } from '../../hooks/useDominios';
@@ -30,6 +30,7 @@ import {
     sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import { Tarea } from '../../lib/supabase/tipos-bd';
+import { AIReviewModal } from '../shared/AIReviewModal';
 
 export const TareasBoard: React.FC = () => {
 
@@ -163,6 +164,7 @@ export const TareasBoard: React.FC = () => {
     const [isDeleteConfirmModalOpen, setDeleteConfirmModalOpen] = useState(false);
 
     const tareasActivas = tareas.filter(t => t.estado === 'Activa');
+    const [isAIModalOpen, setIsAIModalOpen] = useState(false);
     
     const [localTareas, setLocalTareas] = useState<Tarea[]>(tareasActivas);
     const [localColumnas, setLocalColumnas] = useState(columnas);
@@ -397,8 +399,44 @@ export const TareasBoard: React.FC = () => {
         }
     };
 
+    const handleProcessAIAction = async (item: Tarea, actionResult: any) => {
+        if (actionResult.accion === 'actualizar') {
+            const updates: Partial<Tarea> = {};
+            let isUpdateNeeded = false;
+
+            if (actionResult.agregar_descripcion) {
+                const dateHeader = new Date().toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute:'2-digit' });
+                const newNote = `\n\n[IA ${dateHeader}]: ${actionResult.agregar_descripcion}`;
+                updates.descripcion = (item.descripcion || '') + newNote;
+                isUpdateNeeded = true;
+            }
+
+            if (actionResult.mover_a) {
+                // Heurística simple: buscar columna por nombre que contenga la palabra (case insens)
+                const keyword = actionResult.mover_a.toLowerCase();
+                const targetCol = columnas.find(c => c.nombre.toLowerCase().includes(keyword) || keyword.includes(c.nombre.toLowerCase()));
+                if (targetCol && targetCol.id !== item.columna_id) {
+                    updates.columna_id = targetCol.id;
+                    updates.orden = 999; // Al final
+                    isUpdateNeeded = true;
+                }
+            }
+
+            if (isUpdateNeeded) {
+                await actualizarTarea(item.id, updates);
+            }
+        }
+    };
+
     return (
         <div className="h-full flex flex-col gap-4">
+            <AIReviewModal
+                isOpen={isAIModalOpen}
+                onClose={() => setIsAIModalOpen(false)}
+                tipo="tarea"
+                items={localTareas.map(t => ({ ...t, nombre_columna: columnas.find(c => c.id === t.columna_id)?.nombre }))}
+                onProcessAction={handleProcessAIAction}
+            />
             
             {/* Barra de Filtros */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-center">
@@ -424,6 +462,16 @@ export const TareasBoard: React.FC = () => {
                         <option value="Amarillo">Solo Medias (Amarillo)</option>
                         <option value="Verde">Solo Normales (Verde)</option>
                     </select>
+                </div>
+                
+                <div className="ml-auto">
+                    <button
+                        onClick={() => setIsAIModalOpen(true)}
+                        className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                    >
+                        <Sparkles size={18} />
+                        Revisar con IA
+                    </button>
                 </div>
             </div>
 

@@ -2,10 +2,12 @@ import React, { useState, useMemo, useRef } from 'react';
 import { ITRequest, DashboardView, FilterState, RequestType, Urgency, Status, CatalogItem, CatalogoItem } from '../../types';
 import { KanbanBoard } from './KanbanBoard';
 import { RequestTable } from './RequestTable';
-import { LayoutGrid, List, Search, Filter, Plus, DownloadCloud, Save, Trash2, X } from 'lucide-react';
+import { LayoutGrid, List, Search, Filter, Plus, DownloadCloud, Save, Trash2, X, Sparkles } from 'lucide-react';
 import { supabase } from '../../lib/supabase/cliente';
 import { MultiSelectDropdown } from '../shared/MultiSelectDropdown';
 import { useAuth } from '../../hooks/useAuth';
+import { AIReviewModal } from '../shared/AIReviewModal';
+import { apuntesApi } from '../../lib/api/apuntes';
 
 interface DashboardProps {
     requests: ITRequest[];
@@ -23,6 +25,7 @@ interface DashboardProps {
 
 export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onImportTickets, onStatusChange, onDelete, onDeleteBulk, catalogos, onUpdateCatalogoOrder, onUpdateRequest }) => {
     const { user } = useAuth();
+    const [isAIModalOpen, setIsAIModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<DashboardView>('Kanban');
     const [filters, setFilters] = useState<FilterState>({
         domain: [],
@@ -196,8 +199,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
         }
     };
 
+    const pendingRequestsForAI = useMemo(() => requests.filter(req => req.status !== 'Cerrado'), [requests]);
+
+    const handleProcessAIAction = async (item: ITRequest, actionResult: any) => {
+        if (actionResult.accion === 'actualizar') {
+            if (actionResult.estado_nuevo && actionResult.estado_nuevo !== item.status) {
+                 await onUpdateRequest(item.id, { status: actionResult.estado_nuevo as Status });
+            }
+            if (actionResult.agregar_nota) {
+                 await apuntesApi.crear(item.id, `[IA] ${actionResult.agregar_nota}`, user?.id || null);
+            }
+        }
+    };
+
     return (
         <div className="h-full flex flex-col gap-4">
+            <AIReviewModal
+                isOpen={isAIModalOpen}
+                onClose={() => setIsAIModalOpen(false)}
+                tipo="iniciativa"
+                items={pendingRequestsForAI.map(req => ({
+                    ...req,
+                    titulo: req.title,
+                    descripcion: req.description,
+                    estado: req.status
+                }))}
+                onProcessAction={handleProcessAIAction}
+            />
             {/* Action Bar */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
                 <div className="flex items-center gap-2">
@@ -300,6 +328,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                 </div>
 
                 <div className="flex gap-2">
+                    <button
+                        onClick={() => setIsAIModalOpen(true)}
+                        className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                    >
+                        <Sparkles size={18} />
+                        Revisar con IA
+                    </button>
                     <button
                         onClick={onImportTickets}
                         className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
