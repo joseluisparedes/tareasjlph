@@ -2,7 +2,8 @@ import React, { useState, useMemo, useRef } from 'react';
 import { ITRequest, DashboardView, FilterState, RequestType, Urgency, Status, CatalogItem, CatalogoItem } from '../../types';
 import { KanbanBoard } from './KanbanBoard';
 import { RequestTable } from './RequestTable';
-import { LayoutGrid, List, Search, Filter, Plus, DownloadCloud, Save, Trash2, X, Sparkles } from 'lucide-react';
+import { TimelineBoard } from './TimelineBoard';
+import { LayoutGrid, List, Search, Filter, Plus, DownloadCloud, Save, Trash2, X, Sparkles, CalendarDays } from 'lucide-react';
 import { supabase } from '../../lib/supabase/cliente';
 import { MultiSelectDropdown } from '../shared/MultiSelectDropdown';
 import { useAuth } from '../../hooks/useAuth';
@@ -339,6 +340,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         >
                             <List size={18} />
                         </button>
+                        <button
+                            onClick={() => setViewMode('Timeline')}
+                            className={`p-1.5 rounded-md transition-all ${viewMode === 'Timeline' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
+                            title="Vista Cronograma"
+                        >
+                            <CalendarDays size={18} />
+                        </button>
                     </div>
                 </div>
 
@@ -501,6 +509,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         catalogosUrgencia={catalogos.filter(c => c.tipo === 'urgencia').sort((a, b) => (a.orden || 0) - (b.orden || 0))}
                         catalogos={catalogos}
                         onColumnOrderChange={onUpdateCatalogoOrder}
+                    />
+                ) : viewMode === 'Timeline' ? (
+                    <TimelineBoard
+                        requests={filteredRequests}
+                        onEdit={onEditRequest}
                     />
                 ) : (
                     <RequestTable

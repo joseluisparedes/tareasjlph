@@ -54,7 +54,7 @@ export interface CatalogItem {
 }
 
 export type ViewMode = 'Dashboard' | 'Admin' | 'Reports' | 'Integrations';
-export type DashboardView = 'Kanban' | 'Table';
+export type DashboardView = 'Kanban' | 'Table' | 'Timeline';
 
 export interface FilterState {
     domain: string[];

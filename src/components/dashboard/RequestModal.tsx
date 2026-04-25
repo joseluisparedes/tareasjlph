@@ -445,12 +445,16 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                     <div className="col-span-6 sm:col-span-3">
                                         <label className={labelClass}>Fecha Inicio</label>
                                         <input type="date" className={inputClass} disabled={isReadOnly}
-                                            value={formData.fechaInicio || ''} onChange={e => set('fechaInicio', e.target.value)} />
+                                            value={formData.fechaInicio || ''} 
+                                            max={formData.fechaFin || undefined}
+                                            onChange={e => set('fechaInicio', e.target.value)} />
                                     </div>
                                     <div className="col-span-6 sm:col-span-3">
                                         <label className={labelClass}>Fecha Fin</label>
                                         <input type="date" className={inputClass} disabled={isReadOnly}
-                                            value={formData.fechaFin || ''} onChange={e => set('fechaFin', e.target.value)} />
+                                            value={formData.fechaFin || ''} 
+                                            min={formData.fechaInicio || undefined}
+                                            onChange={e => set('fechaFin', e.target.value)} />
                                     </div>
                                 </div>
 
