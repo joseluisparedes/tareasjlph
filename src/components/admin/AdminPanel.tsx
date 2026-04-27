@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CatalogItem, CatalogoItem, CatalogType, User, ITRequest } from '../../types';
-import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, Edit2, Save, X, Plus, Tag, LayoutGrid, List, GripVertical } from 'lucide-react';
+import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, Edit2, Save, X, Plus, Tag, LayoutGrid, List, GripVertical, ChevronDown } from 'lucide-react';
 import { useUsuarios } from '../../hooks/useUsuarios';
 import { useAppSettings } from '../../hooks/useAppSettings';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
@@ -134,6 +134,12 @@ const CatalogSection: React.FC<{
     const [editId, setEditId] = useState<string | null>(null);
     const [editVal, setEditVal] = useState('');
     const [editAbrev, setEditAbrev] = useState('');
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
 
     const handleAdd = () => {
         if (newVal.trim()) {
@@ -165,16 +171,20 @@ const CatalogSection: React.FC<{
 
     return (
         <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200">
+            <div 
+                className="flex items-center justify-between px-4 py-3 bg-slate-50 border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors"
+                onClick={() => setIsExpanded(!isExpanded)}
+            >
                 <div className="flex items-center gap-2">
+                    <ChevronDown size={16} className={`text-slate-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
                     <Tag size={14} className="text-blue-500" />
-                    <span className="text-sm font-semibold text-slate-700">{label}</span>
+                    <span className="text-sm font-semibold text-slate-700 select-none">{label}</span>
                     <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">{items.length}</span>
                 </div>
                 <div className="flex items-center gap-2">
                     {/* Toggle modo visualización */}
                     <button
-                        onClick={onToggleModo}
+                        onClick={(e) => { e.stopPropagation(); onToggleModo(); }}
                         title={modo === 'desplegable' ? 'Cambiar a cuadros de selección rápida' : 'Cambiar a lista desplegable'}
                         className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${modo === 'cuadros'
                             ? 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'
@@ -184,74 +194,75 @@ const CatalogSection: React.FC<{
                         {modo === 'cuadros' ? <LayoutGrid size={11} /> : <List size={11} />}
                         {modo === 'cuadros' ? 'Cuadros' : 'Desplegable'}
                     </button>
-                    <button onClick={() => setAdding(true)}
+                    <button onClick={(e) => { e.stopPropagation(); setAdding(true); setIsExpanded(true); }}
                         className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
                         <Plus size={12} /> Agregar
                     </button>
                 </div>
             </div>
 
-            {adding && (
-                <div className="px-4 py-3 bg-blue-50 border-b border-slate-200 space-y-2">
-                    <div className="flex items-center gap-2">
-                        <input autoFocus type="text" placeholder="Valor completo (ej: Análisis)"
-                            className="flex-1 border border-slate-300 rounded px-2 py-1 text-sm bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 outline-none"
-                            value={newVal} onChange={e => setNewVal(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setAdding(false); }} />
-                        <input type="text" placeholder="Abrev. (ej: ANL)"
-                            className="w-24 border border-slate-300 rounded px-2 py-1 text-sm bg-white text-slate-900 focus:ring-1 focus:ring-violet-500 outline-none"
-                            value={newAbrev} onChange={e => setNewAbrev(e.target.value)} />
-                        <button onClick={handleAdd} className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"><Save size={13} /></button>
-                        <button onClick={() => { setAdding(false); setNewVal(''); setNewAbrev(''); }} className="p-1.5 text-slate-500 hover:bg-slate-200 rounded"><X size={13} /></button>
-                    </div>
-                    <p className="text-xs text-slate-400">La abreviatura se muestra en modo "Cuadros" en el formulario.</p>
-                </div>
-            )}
+            {isExpanded && (
+                <>
+                    {adding && (
+                        <div className="px-4 py-3 bg-blue-50 border-b border-slate-200 space-y-2">
+                            <div className="flex items-center gap-2">
+                                <input autoFocus type="text" placeholder="Valor completo (ej: Análisis)"
+                                    className="flex-1 border border-slate-300 rounded px-2 py-1 text-sm bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 outline-none"
+                                    value={newVal} onChange={e => setNewVal(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setAdding(false); }} />
+                                <input type="text" placeholder="Abrev. (ej: ANL)"
+                                    className="w-24 border border-slate-300 rounded px-2 py-1 text-sm bg-white text-slate-900 focus:ring-1 focus:ring-violet-500 outline-none"
+                                    value={newAbrev} onChange={e => setNewAbrev(e.target.value)} />
+                                <button onClick={handleAdd} className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"><Save size={13} /></button>
+                                <button onClick={() => { setAdding(false); setNewVal(''); setNewAbrev(''); }} className="p-1.5 text-slate-500 hover:bg-slate-200 rounded"><X size={13} /></button>
+                            </div>
+                            <p className="text-xs text-slate-400">La abreviatura se muestra en modo "Cuadros" en el formulario.</p>
+                        </div>
+                    )}
 
-            {items.length === 0 && !adding ? (
-                <p className="text-xs text-slate-400 text-center py-4">Sin valores. Agrega el primero.</p>
-            ) : (
-                <div className="divide-y divide-slate-100">
-                    <DndContext
-                        sensors={useSensors(
-                            useSensor(PointerSensor),
-                            useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-                        )}
-                        collisionDetection={closestCenter}
-                        onDragEnd={({ active, over }) => {
-                            if (active.id !== over?.id) {
-                                const oldIndex = items.findIndex(i => i.id === active.id);
-                                const newIndex = items.findIndex(i => i.id === over?.id);
-                                const sorted = arrayMove(items, oldIndex, newIndex) as CatalogoItem[];
-                                // Actualizar todos los órdenes
-                                sorted.forEach((item, index) => {
-                                    if (item.orden !== index) {
-                                        onUpdate(item.id, { orden: index });
+                    {items.length === 0 && !adding ? (
+                        <p className="text-xs text-slate-400 text-center py-4">Sin valores. Agrega el primero.</p>
+                    ) : (
+                        <div className="divide-y divide-slate-100">
+                            <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={({ active, over }) => {
+                                    if (active.id !== over?.id) {
+                                        const oldIndex = items.findIndex(i => i.id === active.id);
+                                        const newIndex = items.findIndex(i => i.id === over?.id);
+                                        const sorted = arrayMove(items, oldIndex, newIndex) as CatalogoItem[];
+                                        // Actualizar todos los órdenes
+                                        sorted.forEach((item, index) => {
+                                            if (item.orden !== index) {
+                                                onUpdate(item.id, { orden: index });
+                                            }
+                                        });
                                     }
-                                });
-                            }
-                        }}
-                    >
-                        <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
-                            {items.sort((a, b) => (a.orden || 0) - (b.orden || 0)).map(item => (
-                                <SortableCatalogItemRow
-                                    key={item.id}
-                                    item={item}
-                                    tipo={tipo}
-                                    editId={editId}
-                                    editVal={editVal}
-                                    editAbrev={editAbrev}
-                                    setEditId={setEditId}
-                                    setEditVal={setEditVal}
-                                    setEditAbrev={setEditAbrev}
-                                    handleSaveEdit={handleSaveEdit}
-                                    onUpdate={onUpdate}
-                                    handleDeleteClick={handleDeleteClick}
-                                />
-                            ))}
-                        </SortableContext>
-                    </DndContext>
-                </div>
+                                }}
+                            >
+                                <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+                                    {items.sort((a, b) => (a.orden || 0) - (b.orden || 0)).map(item => (
+                                        <SortableCatalogItemRow
+                                            key={item.id}
+                                            item={item}
+                                            tipo={tipo}
+                                            editId={editId}
+                                            editVal={editVal}
+                                            editAbrev={editAbrev}
+                                            setEditId={setEditId}
+                                            setEditVal={setEditVal}
+                                            setEditAbrev={setEditAbrev}
+                                            handleSaveEdit={handleSaveEdit}
+                                            onUpdate={onUpdate}
+                                            handleDeleteClick={handleDeleteClick}
+                                        />
+                                    ))}
+                                </SortableContext>
+                            </DndContext>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );

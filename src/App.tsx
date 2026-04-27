@@ -8,6 +8,7 @@ import { BulkOperations } from './components/dashboard/BulkOperations';
 import { AuthPage } from './components/auth/AuthPage';
 import { TareasModule } from './components/tareas/TareasModule';
 import { CalendarioModule } from './components/calendario/CalendarioModule';
+import { ConfirmModal } from './components/shared/ConfirmModal';
 import { ITRequest, ViewMode, CatalogItem, RequestType, Urgency, Status } from './types';
 import { useSolicitudes } from './hooks/useSolicitudes';
 import { useDominios } from './hooks/useDominios';
@@ -70,6 +71,8 @@ export default function App() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRequest, setEditingRequest] = useState<ITRequest | null>(null);
     const [historialFechas, setHistorialFechas] = useState<SolicitudFecha[]>([]);
+    const [duplicateConfirmReq, setDuplicateConfirmReq] = useState<ITRequest | null>(null);
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
     const {
         solicitudes,
@@ -96,9 +99,15 @@ export default function App() {
 
     const { getModo, setModo } = useCatalogoConfig();
 
-    const handleDeleteRequest = async (id: string) => {
-        await eliminarSolicitud(id);
+    const handleDeleteRequest = (id: string) => {
+        setDeleteConfirmId(id);
+    };
+
+    const confirmDeleteRequest = async () => {
+        if (!deleteConfirmId) return;
+        await eliminarSolicitud(deleteConfirmId);
         setIsModalOpen(false);
+        setDeleteConfirmId(null);
     };
 
     // Pantalla de carga inicial
@@ -225,6 +234,53 @@ export default function App() {
             }
         }
         setIsModalOpen(false);
+    };
+
+    const handleDuplicateRequest = async (req: ITRequest) => {
+        setDuplicateConfirmReq(req);
+    };
+
+    const confirmDuplicateRequest = async () => {
+        if (!user || !duplicateConfirmReq) return;
+        const req = duplicateConfirmReq;
+        
+        const dominioId = dominios.find(d => d.nombre === req.domain)?.id ?? dominios[0]?.id;
+        if (!dominioId) return;
+
+        const datos = {
+            titulo: `${req.title} - Copia`,
+            descripcion: req.description || '',
+            tipo_solicitud: req.type as Solicitud['tipo_solicitud'],
+            dominio_id: dominioId,
+            solicitante: req.requester,
+            urgencia: req.urgency as Solicitud['urgencia'],
+            estado: req.status as Solicitud['estado'],
+            asignado_a: req.assigneeId || null,
+            fecha_vencimiento: null,
+            id_externo: null,
+            creado_por: user.id,
+            prioridad: req.priority || null,
+            tarea_sn: req.tareaSN || null,
+            ticket_rit: req.ticketRIT || null,
+            fecha_inicio: req.fechaInicio || null,
+            fecha_fin: req.fechaFin || null,
+            direccion_solicitante: req.direccionSolicitante || null,
+            brm: req.brm || null,
+            institucion: req.institucion || null,
+            tipo_tarea: req.tipoTarea || null,
+            complejidad: req.complejidad || null,
+            ingresado_gestion_demanda: req.ingresadoGestionDemanda || null,
+        };
+
+        const nueva = await crearSolicitud(datos);
+        if (datos.fecha_inicio) {
+            await fechasApi.registrar(nueva.id, 'inicio', datos.fecha_inicio, user.id);
+        }
+        if (datos.fecha_fin) {
+            await fechasApi.registrar(nueva.id, 'fin', datos.fecha_fin, user.id);
+        }
+        
+        setDuplicateConfirmReq(null);
     };
 
     const handleUpdateDomain = async (updatedDomain: CatalogItem) => {
@@ -441,6 +497,7 @@ export default function App() {
                                 domains={domains}
                                 onEditRequest={handleEditRequest}
                                 onNewRequest={handleOpenNewRequest}
+                                onDuplicateRequest={handleDuplicateRequest}
                                 onImportTickets={handleImportTickets}
                                 onStatusChange={handleRequestStatusChange}
                                 catalogos={catalogos}
@@ -499,6 +556,28 @@ export default function App() {
                     </div>
                 )}
             </main>
+
+            <ConfirmModal
+                isOpen={!!duplicateConfirmReq}
+                title="Duplicar Solicitud"
+                message={<p>¿Estás seguro que deseas crear una copia exacta de la solicitud <strong>{duplicateConfirmReq?.id}</strong> en tu tablero?</p>}
+                confirmText="Duplicar"
+                cancelText="Cancelar"
+                type="info"
+                onConfirm={confirmDuplicateRequest}
+                onCancel={() => setDuplicateConfirmReq(null)}
+            />
+
+            <ConfirmModal
+                isOpen={!!deleteConfirmId}
+                title="Eliminar Solicitud"
+                message={<p>¿Estás seguro de que deseas eliminar la solicitud <strong>{deleteConfirmId}</strong>? Esta acción no se puede deshacer.</p>}
+                confirmText="Eliminar"
+                cancelText="Cancelar"
+                type="danger"
+                onConfirm={confirmDeleteRequest}
+                onCancel={() => setDeleteConfirmId(null)}
+            />
 
             <RequestModal
                 isOpen={isModalOpen}

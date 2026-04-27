@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ITRequest, Status, Urgency, CatalogoItem } from '../../types';
 import { MOCK_USERS } from '../../data/constants';
-import { AlertCircle, GripVertical } from 'lucide-react';
+import { AlertCircle, GripVertical, Copy } from 'lucide-react';
 import {
     DndContext,
     closestCorners,
@@ -35,6 +35,7 @@ interface KanbanBoardProps {
     catalogosUrgencia?: CatalogoItem[];
     catalogos: CatalogoItem[];
     onColumnOrderChange?: (newOrder: string[]) => void;
+    onDuplicate?: (req: ITRequest) => void;
 }
 
 const getUrgencyStyle = (urgency: Urgency, catalogos?: CatalogoItem[]) => {
@@ -61,10 +62,11 @@ interface SortableItemProps {
     req: ITRequest;
     onEdit: (request: ITRequest) => void;
     onDelete?: (id: string) => void;
+    onDuplicate?: (req: ITRequest) => void;
     catalogosUrgencia?: CatalogoItem[];
 }
 
-const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ req, onEdit, onDelete, catalogosUrgencia, isOverlay }) => {
+const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ req, onEdit, onDelete, onDuplicate, catalogosUrgencia, isOverlay }) => {
     const { user, esAdministrador } = useAuth();
     const canEdit = esAdministrador || req.creadorId === user?.id;
     const assignee = MOCK_USERS.find(u => u.id === req.assigneeId);
@@ -83,14 +85,24 @@ const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ re
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
-                                if (window.confirm('¿Eliminar solicitud?')) {
-                                    onDelete?.(req.id);
-                                }
+                                onDelete?.(req.id);
                             }}
                             className="text-slate-400 hover:text-red-500 p-0.5 rounded transition-colors opacity-0 group-hover:opacity-100"
                             title="Eliminar"
                         >
                             <AlertCircle size={14} />
+                        </button>
+                    )}
+                    {canEdit && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDuplicate?.(req);
+                            }}
+                            className="text-slate-400 hover:text-indigo-500 p-0.5 rounded transition-colors opacity-0 group-hover:opacity-100"
+                            title="Duplicar Solicitud"
+                        >
+                            <Copy size={14} />
                         </button>
                     )}
                     <span
@@ -170,10 +182,11 @@ interface KanbanColumnProps {
     requests: ITRequest[];
     onEdit: (req: ITRequest) => void;
     onDelete?: (id: string) => void;
+    onDuplicate?: (req: ITRequest) => void;
     catalogosUrgencia?: CatalogoItem[];
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, onDelete, catalogosUrgencia }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, onDelete, onDuplicate, catalogosUrgencia }) => {
     const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
         id: status,
         data: { type: 'Column', status },
@@ -213,6 +226,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, o
                             req={req}
                             onEdit={onEdit}
                             onDelete={onDelete}
+                            onDuplicate={onDuplicate}
                             catalogosUrgencia={catalogosUrgencia}
                         />
                     ))}
@@ -223,7 +237,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, o
 };
 
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onStatusChange, onDelete, catalogosUrgencia, catalogos, onColumnOrderChange }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onStatusChange, onDelete, onDuplicate, catalogosUrgencia, catalogos, onColumnOrderChange }) => {
     // Local state to handle visual reordering immediately
     const [localRequests, setLocalRequests] = useState<ITRequest[]>(requests);
     const [columns, setColumns] = useState<string[]>([]);
@@ -402,6 +416,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
                             requests={localRequests.filter(r => r.status === status)}
                             onEdit={onEdit}
                             onDelete={onDelete}
+                            onDuplicate={onDuplicate}
                             catalogosUrgencia={catalogosUrgencia}
                         />
                     ))}
@@ -415,6 +430,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
                             req={activeItem as ITRequest}
                             onEdit={() => { }}
                             onDelete={undefined}
+                            onDuplicate={undefined}
                             catalogosUrgencia={catalogosUrgencia}
                             isOverlay
                         />

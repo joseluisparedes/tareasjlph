@@ -3,7 +3,7 @@ import { ITRequest, RequestType, Urgency, Status, CatalogItem, CatalogoItem, Cat
 import type { SolicitudFecha, SolicitudApunte } from '../../lib/supabase/tipos-bd';
 import { apuntesApi } from '../../lib/api/apuntes';
 import { useAuth } from '../../hooks/useAuth';
-import { X, Save, Calendar, Hash, FileText, History, User, Grid } from 'lucide-react';
+import { X, Save, Calendar, Hash, FileText, History, User, Grid, Star, Plus, Trash2, Copy } from 'lucide-react';
 
 interface RequestModalProps {
     isOpen: boolean;
@@ -18,6 +18,7 @@ interface RequestModalProps {
 }
 
 import { SelectorCampo } from '../shared/SelectorCampo';
+import { ConfirmModal } from '../shared/ConfirmModal';
 
 const inputClass = "mt-1 block w-full rounded-md border-slate-300 shadow-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm border p-2 bg-white text-slate-900 placeholder-slate-400";
 const labelClass = "block text-xs font-semibold text-slate-600 uppercase tracking-wide";
@@ -95,6 +96,95 @@ export const RequestModal: React.FC<RequestModalProps> = ({
         return () => window.removeEventListener('apuntes-actualizados', handleApuntesUpdate as EventListener);
     }, [isOpen, request?.id]);
 
+    // --- Lógica de Selecciones Favoritas ---
+    const [savedFavorites, setSavedFavorites] = useState<{ id: string, name: string, data: Partial<ITRequest> }[]>([]);
+    const [isFavoriteMenuOpen, setIsFavoriteMenuOpen] = useState(false);
+    const [newFavoriteName, setNewFavoriteName] = useState('');
+    const [showSaveFavInput, setShowSaveFavInput] = useState(false);
+    const favoriteMenuRef = useRef<HTMLDivElement>(null);
+    const [showDuplicateConfirm, setShowDuplicateConfirm] = useState(false);
+    const [deleteApunteConfirmId, setDeleteApunteConfirmId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (user && isOpen) {
+            const favs = localStorage.getItem(`favorite_requests_${user.id}`);
+            if (favs) {
+                try {
+                    setSavedFavorites(JSON.parse(favs));
+                } catch (e) {
+                    console.error("Error parsing favorites", e);
+                }
+            }
+        }
+    }, [user, isOpen]);
+
+    const saveFavoritesToStorage = (favs: { id: string, name: string, data: Partial<ITRequest> }[]) => {
+        if (user) {
+            localStorage.setItem(`favorite_requests_${user.id}`, JSON.stringify(favs));
+            setSavedFavorites(favs);
+        }
+    };
+
+    const handleSaveFavorite = () => {
+        if (!newFavoriteName.trim()) return;
+        // Solo guardar campos que no sean ID, createdAt, apuntes, etc.
+        // También ignoramos Título, Descripción, Tarea SN, Ticket RIT, Fechas, Prioridad y Usuario Solicitante
+        const { 
+            id, createdAt, creadorId, creadorNombre, externalId, 
+            title, description, priority, tareaSN, ticketRIT, fechaInicio, fechaFin, requester,
+            ...dataToSave 
+        } = formData as any;
+        
+        const newFav = {
+            id: Date.now().toString(),
+            name: newFavoriteName,
+            data: dataToSave
+        };
+        const updatedFavs = [newFav, ...savedFavorites];
+        saveFavoritesToStorage(updatedFavs);
+        setNewFavoriteName('');
+        setShowSaveFavInput(false);
+    };
+
+    const handleLoadFavorite = (fav: { data: Partial<ITRequest> }) => {
+        setFormData(prev => ({ 
+            ...prev, 
+            ...fav.data, 
+            // Restauramos los valores actuales que no deben ser sobreescritos por la plantilla
+            id: prev.id, 
+            createdAt: prev.createdAt,
+            title: prev.title,
+            description: prev.description,
+            priority: prev.priority,
+            tareaSN: prev.tareaSN,
+            ticketRIT: prev.ticketRIT,
+            fechaInicio: prev.fechaInicio,
+            fechaFin: prev.fechaFin,
+            requester: prev.requester
+        }));
+        setIsFavoriteMenuOpen(false);
+    };
+
+    const handleDeleteFavorite = (id: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        const updatedFavs = savedFavorites.filter(f => f.id !== id);
+        saveFavoritesToStorage(updatedFavs);
+    };
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (favoriteMenuRef.current && !favoriteMenuRef.current.contains(event.target as Node)) {
+                setIsFavoriteMenuOpen(false);
+                setShowSaveFavInput(false);
+            }
+        };
+
+        if (isFavoriteMenuOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isFavoriteMenuOpen]);
+
     const handleGuardarApunte = async () => {
         if (!nuevoApunte.trim() || !request?.id) return;
         setGuardandoApunte(true);
@@ -112,16 +202,39 @@ export const RequestModal: React.FC<RequestModalProps> = ({
         }
     };
 
-    const handleEliminarApunte = async (id: string) => {
-        if (!window.confirm('¿Eliminar este apunte?')) return;
+    const handleDuplicate = () => {
+        setShowDuplicateConfirm(true);
+    };
+
+    const confirmDuplicate = () => {
+        setFormData(prev => ({
+            ...prev,
+            id: '',
+            createdAt: '',
+            creadorId: '',
+            creadorNombre: '',
+            externalId: '',
+            title: prev.title ? `${prev.title} - Copia` : 'Copia',
+        }));
+        setApuntes([]);
+        setShowDuplicateConfirm(false);
+    };
+
+    const handleEliminarApunte = (id: string) => {
+        setDeleteApunteConfirmId(id);
+    };
+
+    const confirmEliminarApunte = async () => {
+        if (!deleteApunteConfirmId) return;
         try {
-            await apuntesApi.eliminar(id);
-            setApuntes(prev => prev.filter(a => a.id !== id));
+            await apuntesApi.eliminar(deleteApunteConfirmId);
+            setApuntes(prev => prev.filter(a => a.id !== deleteApunteConfirmId));
             window.dispatchEvent(new CustomEvent('apuntes-actualizados', { detail: { requestId: request?.id, source: 'RequestModal' } }));
         } catch (error) {
             console.error("Error al eliminar apunte:", error);
             alert("No se pudo eliminar el apunte.");
         }
+        setDeleteApunteConfirmId(null);
     };
 
     const handleIniciarEdicion = (apunte: SolicitudApunte) => {
@@ -191,9 +304,88 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                 {request ? 'Modifica los campos necesarios.' : 'Completa la información.'}
                             </p>
                         </div>
-                        <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-200 transition-colors">
-                            <X size={20} />
-                        </button>
+                        <div className="flex items-center gap-3">
+                            {/* Menú de Favoritos */}
+                            {canEdit && (
+                                <div className="relative" ref={favoriteMenuRef}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsFavoriteMenuOpen(!isFavoriteMenuOpen)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-lg text-xs font-medium transition-colors"
+                                    >
+                                        <Star size={14} className={savedFavorites.length > 0 ? "fill-yellow-500" : ""} />
+                                        Selección Favorita
+                                    </button>
+
+                                    {isFavoriteMenuOpen && (
+                                        <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-slate-200 z-50 p-2">
+                                            <div className="mb-2 pb-2 border-b border-slate-100">
+                                                {!showSaveFavInput ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowSaveFavInput(true)}
+                                                        className="w-full text-left px-3 py-2 text-sm text-yellow-600 hover:bg-yellow-50 rounded-md font-medium flex items-center gap-2"
+                                                    >
+                                                        <Plus size={14} /> Guardar selección actual
+                                                    </button>
+                                                ) : (
+                                                    <div className="flex gap-2 p-1">
+                                                        <input
+                                                            autoFocus
+                                                            type="text"
+                                                            placeholder="Nombre favorito..."
+                                                            className="flex-1 text-sm border rounded px-2 py-1"
+                                                            value={newFavoriteName}
+                                                            onChange={e => setNewFavoriteName(e.target.value)}
+                                                            onKeyDown={e => e.key === 'Enter' && handleSaveFavorite()}
+                                                        />
+                                                        <button type="button" onClick={handleSaveFavorite} className="text-yellow-600 hover:text-yellow-800"><Save size={16} /></button>
+                                                        <button type="button" onClick={() => setShowSaveFavInput(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="max-h-60 overflow-y-auto">
+                                                {savedFavorites.length === 0 ? (
+                                                    <p className="text-xs text-slate-400 text-center py-2">No tienes selecciones favoritas</p>
+                                                ) : (
+                                                    savedFavorites.map(fav => (
+                                                        <div key={fav.id}
+                                                            onClick={() => handleLoadFavorite(fav)}
+                                                            className="group flex items-center justify-between px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
+                                                        >
+                                                            <span className="truncate pr-2">{fav.name}</span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => handleDeleteFavorite(fav.id, e)}
+                                                                className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-opacity flex-shrink-0"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {request?.id && (
+                                <button
+                                    type="button"
+                                    onClick={handleDuplicate}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-medium transition-colors"
+                                    title="Duplicar Solicitud"
+                                >
+                                    <Copy size={14} />
+                                    Duplicar
+                                </button>
+                            )}
+
+                            <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-200 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
                     </div>
 
                     <form onSubmit={handleSubmit}>
@@ -492,10 +684,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        if (window.confirm('¿Estás seguro de eliminar esta solicitud?')) {
-                                            onDelete?.(request.id);
-                                            onClose();
-                                        }
+                                        onDelete?.(request.id);
                                     }}
                                     className="px-4 py-2 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
                                 >
@@ -519,6 +708,28 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                     </form>
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={showDuplicateConfirm}
+                title="Duplicar Solicitud"
+                message={<p>¿Estás seguro de que deseas crear una copia en borrador de esta solicitud? Todos los campos serán clonados, pero se te permitirá revisarlos y guardarlos como una nueva solicitud.</p>}
+                confirmText="Clonar"
+                cancelText="Cancelar"
+                type="info"
+                onConfirm={confirmDuplicate}
+                onCancel={() => setShowDuplicateConfirm(false)}
+            />
+
+            <ConfirmModal
+                isOpen={!!deleteApunteConfirmId}
+                title="Eliminar Apunte"
+                message={<p>¿Estás seguro de que deseas eliminar este apunte permanentemente?</p>}
+                confirmText="Eliminar"
+                cancelText="Cancelar"
+                type="danger"
+                onConfirm={confirmEliminarApunte}
+                onCancel={() => setDeleteApunteConfirmId(null)}
+            />
         </div>
     );
 };

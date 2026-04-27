@@ -15,6 +15,7 @@ interface DashboardProps {
     domains: CatalogItem[];
     onEditRequest: (req: ITRequest) => void;
     onNewRequest: () => void;
+    onDuplicateRequest?: (req: ITRequest) => void;
     onImportTickets: () => void;
     onStatusChange: (requestId: string, newStatus: Status) => void;
     onDelete: (id: string) => void;
@@ -24,7 +25,7 @@ interface DashboardProps {
     onUpdateRequest: (id: string, data: Partial<ITRequest>) => Promise<void>;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onImportTickets, onStatusChange, onDelete, onDeleteBulk, catalogos, onUpdateCatalogoOrder, onUpdateRequest }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onDuplicateRequest, onImportTickets, onStatusChange, onDelete, onDeleteBulk, catalogos, onUpdateCatalogoOrder, onUpdateRequest }) => {
     const { user } = useAuth();
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
     const [viewMode, setViewMode] = useState<DashboardView>('Kanban');
@@ -505,6 +506,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     <KanbanBoard
                         requests={filteredRequests}
                         onEdit={onEditRequest}
+                        onDuplicate={onDuplicateRequest}
                         onStatusChange={onStatusChange}
                         catalogosUrgencia={catalogos.filter(c => c.tipo === 'urgencia').sort((a, b) => (a.orden || 0) - (b.orden || 0))}
                         catalogos={catalogos}
