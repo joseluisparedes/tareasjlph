@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, Copy, Trash2, Info, X } from 'lucide-react';
+import { AlertCircle, Copy, Trash2, Info, X, CheckCircle2 } from 'lucide-react';
 
 export type ConfirmModalType = 'danger' | 'info' | 'warning' | 'success';
 
@@ -41,6 +41,11 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         colorClass = 'text-amber-600';
         bgClass = 'bg-amber-100';
         btnClass = 'bg-amber-600 hover:bg-amber-700 text-white';
+    } else if (type === 'success') {
+        Icon = CheckCircle2;
+        colorClass = 'text-green-600';
+        bgClass = 'bg-green-100';
+        btnClass = 'bg-green-600 hover:bg-green-700 text-white';
     } else if (type === 'info') {
         // Podríamos usar Copy si el texto incluye 'copia' o 'duplicar', pero lo mantendremos general
         if (title.toLowerCase().includes('copia') || title.toLowerCase().includes('duplicar')) {

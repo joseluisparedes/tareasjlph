@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Tarea } from '../../lib/supabase/tipos-bd';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { CheckCircle2, Copy, Mail, FileText } from 'lucide-react';
+import { ConfirmModal } from '../shared/ConfirmModal';
 
 interface TarjetaTareaProps {
     tarea: Tarea;
@@ -28,6 +29,8 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ tarea, onEdit, onFin
         transition,
         isDragging,
     } = useSortable({ id: tarea.id, data: { type: 'Tarea', columna_id: tarea.columna_id } });
+
+    const [isFinalizeModalOpen, setFinalizeModalOpen] = useState(false);
 
     const style = {
         transform: CSS.Translate.toString(transform),
@@ -93,9 +96,7 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ tarea, onEdit, onFin
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm('¿Marcar tarea como Terminada?')) {
-                                onFinalize(tarea.id);
-                            }
+                            setFinalizeModalOpen(true);
                         }}
                         className="text-slate-400 hover:text-green-600 p-1.5 rounded-md transition-colors hover:bg-green-50"
                         title="Tarea terminada"
@@ -120,6 +121,16 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ tarea, onEdit, onFin
                 )}
             </div>
             
+            <ConfirmModal 
+                isOpen={isFinalizeModalOpen}
+                title="¿Marcar tarea como Terminada?"
+                message="¿Estás seguro de que deseas marcar esta tarea como terminada?"
+                confirmText="Sí, terminar"
+                cancelText="Cancelar"
+                type="success"
+                onConfirm={() => onFinalize(tarea.id)}
+                onCancel={() => setFinalizeModalOpen(false)}
+            />
         </div>
     );
 

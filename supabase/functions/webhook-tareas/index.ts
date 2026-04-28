@@ -26,7 +26,7 @@ serve(async (req) => {
        return new Response(JSON.stringify({ error: 'Falta título o el ID de la columna' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // --- PROCESAMIENTO CON IA (GEMINI) ---
+    // --- PROCESAMIENTO SIN IA (Limpieza y Truncado) ---
     if (descripcion && descripcion.length > 0) {
       const limpiarHTML = (texto: string) => {
         return texto
@@ -39,53 +39,9 @@ serve(async (req) => {
       };
 
       const descripcionLimpia = limpiarHTML(descripcion);
-
-      try {
-        const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY');
-        if (GEMINI_API_KEY && descripcionLimpia.length > 5) {
-          const textoParaResumir = descripcionLimpia.substring(0, 30000);
-          
-          const response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{
-                  parts: [{
-                    text: `Actúa como un asistente de gestión de proyectos. El siguiente texto es un correo electrónico. Genera un resumen ejecutivo de máximo 200 caracteres enfocándote en la solicitud principal o acción requerida. No uses frases como 'El resumen es'. Texto: ${textoParaResumir}`
-                  }]
-                }],
-                generationConfig: {
-                  maxOutputTokens: 150,
-                  temperature: 0.1,
-                }
-              })
-            }
-          );
-
-          if (response.ok) {
-            const dataIA = await response.json();
-            const resumenIA = dataIA.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (resumenIA) {
-              descripcion = resumenIA.trim().substring(0, 200);
-            } else {
-              // Si la IA responde ok pero sin texto (raro), usamos el fallback inteligente
-              descripcion = descripcionLimpia.length <= 200 ? descripcionLimpia : descripcionLimpia.substring(0, 197) + "...";
-            }
-          } else {
-            console.warn("Fallo en Gemini API (posible cuota). Usando fallback inteligente.");
-            // Si el mensaje ya es corto, lo dejamos igual. Solo cortamos si es largo.
-            descripcion = descripcionLimpia.length <= 200 ? descripcionLimpia : descripcionLimpia.substring(0, 197) + "...";
-          }
-        } else {
-          // Sin clave: fallback inteligente
-          descripcion = descripcionLimpia.length <= 200 ? descripcionLimpia : descripcionLimpia.substring(0, 197) + "...";
-        }
-      } catch (errorIA) {
-        console.error("Error IA:", errorIA);
-        descripcion = descripcionLimpia.length <= 200 ? descripcionLimpia : descripcionLimpia.substring(0, 197) + "...";
-      }
+      
+      // IA deshabilitada: usamos solo fallback inteligente
+      descripcion = descripcionLimpia.length <= 200 ? descripcionLimpia : descripcionLimpia.substring(0, 197) + "...";
     }
     // -------------------------------------
 
