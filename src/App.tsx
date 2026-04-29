@@ -9,6 +9,7 @@ import { AuthPage } from './components/auth/AuthPage';
 import { TareasModule } from './components/tareas/TareasModule';
 import { CalendarioModule } from './components/calendario/CalendarioModule';
 import { ConfirmModal } from './components/shared/ConfirmModal';
+import { NotificationBell } from './components/shared/NotificationBell';
 import { ITRequest, ViewMode, CatalogItem, RequestType, Urgency, Status } from './types';
 import { useSolicitudes } from './hooks/useSolicitudes';
 import { useDominios } from './hooks/useDominios';
@@ -457,8 +458,15 @@ export default function App() {
                     </div>
 
                     {/* User info + logout */}
-                    <div className="flex items-center gap-3">
-                        <div className="text-right">
+                    <div className="flex items-center gap-4">
+                        <NotificationBell
+                            requests={requests}
+                            onNotificationClick={(id) => {
+                                const req = requests.find(r => r.id === id);
+                                if (req) handleEditRequest(req);
+                            }}
+                        />
+                        <div className="text-right border-l border-slate-200 pl-4">
                             <p className="text-sm font-medium text-slate-700">
                                 {perfil?.nombre_completo ?? user.user_metadata?.nombre_completo ?? user.email}
                             </p>

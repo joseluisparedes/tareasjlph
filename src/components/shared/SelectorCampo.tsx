@@ -41,8 +41,11 @@ export const SelectorCampo: React.FC<SelectorCampoProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const normalizeString = (str: string) => 
+        str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
     const filteredOptions = listaOpciones.filter(op =>
-        op.valor.toLowerCase().includes(searchTerm.toLowerCase())
+        normalizeString(op.valor).includes(normalizeString(searchTerm))
     );
 
     const handleSelect = (val: string) => {

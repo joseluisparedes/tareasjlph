@@ -588,7 +588,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                         <div className="-mt-14 opacity-0 pointer-events-none absolute"><input required disabled={isReadOnly} /> {/* Hack validación HTML5 si hidden */} </div>
                                     )}
 
-                                    <SelectorCampo label="Dirección Solicitante"
+                                    <SelectorCampo label="Dirección Solicitante" required
                                         valor={formData.direccionSolicitante || ''} onChange={v => set('direccionSolicitante', v)} disabled={isReadOnly}
                                         opciones={direcciones} modo={getM('direccion_solicitante')} />
 
@@ -596,7 +596,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                         valor={formData.institucion || ''} onChange={v => set('institucion', v)} disabled={isReadOnly}
                                         opciones={instituciones} modo={getM('institucion')} />
 
-                                    <SelectorCampo label="BRM"
+                                    <SelectorCampo label="BRM" required
                                         valor={formData.brm || ''} onChange={v => set('brm', v)} disabled={isReadOnly}
                                         opciones={brms} modo={getM('brm')} />
                                 </div>

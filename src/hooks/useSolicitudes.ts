@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { solicitudesApi } from '../lib/api/solicitudes';
 import type { Solicitud } from '../lib/supabase/tipos-bd';
 import { useAuth } from './useAuth';
+import { supabase } from '../lib/supabase/cliente';
 
 export function useSolicitudes() {
     const { user } = useAuth();
@@ -64,6 +65,16 @@ export function useSolicitudes() {
     };
 
     const eliminarSolicitud = async (id: string) => {
+        // Desvincular cualquier tarea que estuviera relacionada con esta iniciativa
+        const { error: errorTareas } = await supabase
+            .from('tareas')
+            .update({ iniciativa_id: null })
+            .eq('iniciativa_id', id);
+
+        if (errorTareas) {
+            console.error('Error al desvincular tareas de la iniciativa eliminada:', errorTareas);
+        }
+
         await solicitudesApi.eliminar(id);
         setSolicitudes(prev => prev.filter(s => s.id !== id));
         notifySync();
