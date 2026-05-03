@@ -202,7 +202,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, o
         <div
             ref={setNodeRef}
             style={style}
-            className="min-w-[300px] flex-1 flex flex-col rounded-xl border transition-colors duration-200 h-full bg-slate-100/50 border-slate-200"
+            className="min-w-[300px] w-[85vw] md:w-auto md:flex-1 flex flex-col rounded-xl border transition-colors duration-200 h-full bg-slate-100/50 border-slate-200 snap-center md:snap-none shrink-0"
         >
             <div
                 {...attributes}
@@ -407,7 +407,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
                 },
             }}
         >
-            <div className="flex h-full gap-4 overflow-x-auto pb-4 items-start px-2">
+            <div className="flex h-full gap-4 overflow-x-auto pb-4 items-start px-2 snap-x snap-mandatory">
                 <SortableContext items={columns} strategy={horizontalListSortingStrategy}>
                     {columns.map((status) => (
                         <KanbanColumn

@@ -288,10 +288,10 @@ export const RequestModal: React.FC<RequestModalProps> = ({
             <div className="flex items-center justify-center min-h-screen p-4">
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
 
-                <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-4xl"> {/* Ancho aumentado a 4xl para layout más cómodo */}
+                <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] sm:max-h-none flex flex-col"> {/* Ancho aumentado a 4xl para layout más cómodo */}
                     {/* Header */}
-                    <div className="flex items-start justify-between px-6 py-4 border-b border-slate-200 bg-slate-50 rounded-t-xl">
-                        <div>
+                    <div className="flex items-start justify-between px-4 sm:px-6 py-4 border-b border-slate-200 bg-slate-50 rounded-t-xl shrink-0">
+                        <div className="pr-2">
                             <h3 className="text-lg font-bold text-slate-800">
                                 {request ? `Editar Solicitud: ${request.id}` : 'Nueva Solicitud TI'}
                             </h3>
@@ -304,17 +304,17 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                 {request ? 'Modifica los campos necesarios.' : 'Completa la información.'}
                             </p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center justify-end gap-2 shrink-0">
                             {/* Menú de Favoritos */}
                             {canEdit && (
                                 <div className="relative" ref={favoriteMenuRef}>
                                     <button
                                         type="button"
                                         onClick={() => setIsFavoriteMenuOpen(!isFavoriteMenuOpen)}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-lg text-xs font-medium transition-colors"
+                                        className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 border border-yellow-200 rounded-lg text-xs font-medium transition-colors"
                                     >
                                         <Star size={14} className={savedFavorites.length > 0 ? "fill-yellow-500" : ""} />
-                                        Selección Favorita
+                                        <span className="hidden sm:inline">Selección Favorita</span>
                                     </button>
 
                                     {isFavoriteMenuOpen && (
@@ -374,11 +374,11 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                 <button
                                     type="button"
                                     onClick={handleDuplicate}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-medium transition-colors"
+                                    className="flex items-center gap-1.5 px-2 sm:px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-medium transition-colors"
                                     title="Duplicar Solicitud"
                                 >
                                     <Copy size={14} />
-                                    Duplicar
+                                    <span className="hidden sm:inline">Duplicar</span>
                                 </button>
                             )}
 
@@ -388,8 +388,8 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                         </div>
                     </div>
 
-                    <form onSubmit={handleSubmit}>
-                        <div className="px-6 py-5 space-y-6 max-h-[75vh] overflow-y-auto">
+                    <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+                        <div className="px-4 sm:px-6 py-5 space-y-6">
 
                             {/* 1. Información Principal y Apuntes */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -517,7 +517,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                 <h4 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
                                     <Grid size={14} /> Clasificación
                                 </h4>
-                                <div className="grid grid-cols-6 gap-x-4 gap-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-6 gap-x-4 gap-y-4">
                                     {/* Dominio TI */}
                                     <div className="col-span-6 sm:col-span-3">
                                         <label className={labelClass}>Dominio TI <span className="text-red-500 normal-case">*</span></label>
@@ -577,7 +577,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                 <h4 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
                                     <User size={14} /> Solicitante e Institución
                                 </h4>
-                                <div className="grid grid-cols-6 gap-x-4 gap-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-6 gap-x-4 gap-y-4">
                                     <SelectorCampo label="Usuario Solicitante" required
                                         valor={formData.requester || ''} onChange={v => set('requester', v)} disabled={isReadOnly}
                                         opciones={usuarios} modo={getM('usuario_solicitante')}
@@ -610,7 +610,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                 <h4 className="text-xs font-bold text-blue-600 uppercase tracking-widest mb-3 flex items-center gap-2">
                                     <Hash size={14} /> Seguimiento y Fechas
                                 </h4>
-                                <div className="grid grid-cols-6 gap-x-4 gap-y-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-6 gap-x-4 gap-y-4">
                                     <SelectorCampo label="Asignado A"
                                         valor={formData.assigneeId || ''} onChange={v => set('assigneeId', v || null)} disabled={isReadOnly}
                                         opciones={asignados} modo={getM('asignado_a')} placeholder="-- Sin asignar --" />
@@ -679,7 +679,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl flex justify-between gap-3">
+                        <div className="px-4 sm:px-6 py-4 border-t border-slate-200 bg-slate-50 rounded-b-xl flex flex-wrap justify-between gap-3 shrink-0">
                             {request && canEdit && (
                                 <button
                                     type="button"

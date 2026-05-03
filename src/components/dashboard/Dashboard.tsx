@@ -28,6 +28,7 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onDuplicateRequest, onImportTickets, onStatusChange, onDelete, onDeleteBulk, catalogos, onUpdateCatalogoOrder, onUpdateRequest }) => {
     const { user } = useAuth();
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+    const [isFiltersVisibleMobile, setIsFiltersVisibleMobile] = useState(false);
     const [viewMode, setViewMode] = useState<DashboardView>('Kanban');
     const [filters, setFilters] = useState<FilterState>({
         domain: [],
@@ -245,13 +246,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
             />
             {/* Action Bar */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
-                <div className="flex items-center gap-2">
-                    <div className="relative flex items-center">
+                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <div className="relative flex items-center flex-1 md:flex-none">
                         <Search className="absolute left-3 text-slate-400" size={18} />
                         <input
                             type="text"
                             placeholder="Buscar solicitudes..."
-                            className="pl-10 pr-10 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none w-64 bg-white text-gray-900"
+                            className="pl-10 pr-10 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none w-full md:w-64 bg-white text-gray-900"
                             value={filters.search}
                             onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
                         />
@@ -326,7 +327,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         )}
                     </div>
 
-                    <div className="flex bg-slate-100 p-1 rounded-lg">
+                    <div className="h-8 w-px bg-slate-200 mx-1 hidden md:block"></div>
+
+                    {/* View Mode Toggles */}
+                    <div className="flex bg-slate-100 p-1 rounded-lg ml-auto md:ml-0">
                         <button
                             onClick={() => setViewMode('Kanban')}
                             className={`p-1.5 rounded-md transition-all ${viewMode === 'Kanban' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}
@@ -351,24 +355,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 w-full md:w-auto mt-2 md:mt-0">
                     <button
                         onClick={() => setIsAIModalOpen(true)}
-                        className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                        className="flex-1 md:flex-none flex justify-center items-center gap-2 bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
                     >
                         <Sparkles size={18} />
-                        Revisar con IA
+                        <span className="hidden sm:inline">Revisar IA</span>
                     </button>
                     <button
                         onClick={onImportTickets}
-                        className="flex items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                        className="flex-1 md:flex-none flex justify-center items-center gap-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
                     >
                         <DownloadCloud size={18} />
-                        Importar Tickets
+                        <span className="hidden sm:inline">Importar</span>
                     </button>
                     <button
                         onClick={onNewRequest}
-                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                        className="w-full sm:w-auto flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
                     >
                         <Plus size={18} />
                         Nueva Solicitud
@@ -376,9 +380,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                 </div>
             </div>
 
+            {/* Mobile Filter Toggle */}
+            <div className="md:hidden flex justify-between items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                <span className="text-sm font-medium text-slate-700">Filtros Avanzados</span>
+                <button 
+                    onClick={() => setIsFiltersVisibleMobile(!isFiltersVisibleMobile)}
+                    className="text-blue-600 bg-blue-50 px-3 py-1.5 rounded-md text-sm font-medium"
+                >
+                    {isFiltersVisibleMobile ? 'Ocultar Filtros' : 'Mostrar Filtros'}
+                </button>
+            </div>
+
             {/* Filter Bar */}
-            <div className="flex flex-wrap gap-2 items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm text-sm">
-                <span className="text-slate-500 flex items-center gap-1 font-medium mr-2">
+            <div className={`${isFiltersVisibleMobile ? 'flex' : 'hidden'} md:flex flex-wrap gap-3 items-center bg-white p-3 rounded-lg border border-slate-200 shadow-sm text-sm`}>
+                <span className="text-slate-500 flex items-center gap-1 font-medium mr-1 hidden md:flex">
                     <Filter size={16} /> Filtros:
                 </span>
 
@@ -451,10 +466,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     selected={filters.brm}
                     onChange={(vals) => handleFilterArrayChange('brm', vals)}
                     placeholder="Todos"
-                    className="w-[150px]"
+                    className="w-full sm:w-[150px]"
                 />
 
-                <div className="flex items-center gap-2 ml-2 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
+                <div className="flex items-center gap-2 w-full sm:w-auto bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
                     <label className="text-xs font-bold text-slate-600 cursor-pointer flex items-center gap-2">
                         <input
                             type="checkbox"

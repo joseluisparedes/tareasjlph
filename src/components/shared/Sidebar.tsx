@@ -23,7 +23,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
     const navItems = todosLosItems.filter(item => !item.soloAdmin || esAdministrador);
 
     return (
-        <aside className={`bg-slate-900 text-white flex flex-col h-screen fixed left-0 top-0 z-10 shadow-xl transition-all duration-300 ${isOpen ? 'w-64' : 'w-20'}`}>
+        <aside className={`bg-slate-900 text-white flex flex-col h-screen fixed left-0 top-0 z-50 shadow-xl transition-all duration-300 ${isOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:translate-x-0 md:w-20'}`}>
             <div className={`p-6 border-b border-slate-800 flex items-center ${isOpen ? 'justify-between' : 'justify-center'}`}>
                 {isOpen && (
                     <div className="overflow-hidden whitespace-nowrap">
@@ -44,7 +44,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, isO
                 {navItems.map((item) => (
                     <button
                         key={item.view}
-                        onClick={() => onChangeView(item.view)}
+                        onClick={() => {
+                            onChangeView(item.view);
+                            if (isOpen) {
+                                toggleSidebar();
+                            }
+                        }}
                         title={!isOpen ? item.label : ''}
                         className={`w-full flex items-center ${isOpen ? 'gap-3 px-4' : 'justify-center px-2'} py-3 rounded-lg transition-colors duration-200 ${currentView === item.view
                             ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50'

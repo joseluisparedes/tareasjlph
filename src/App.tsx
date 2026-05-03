@@ -19,7 +19,7 @@ import { useAuth } from './hooks/useAuth';
 import type { Solicitud, Dominio, SolicitudFecha } from './lib/supabase/tipos-bd';
 import type { CatalogType } from './types';
 import { fechasApi } from './lib/api/fechas';
-import { LogOut, Loader2 } from 'lucide-react';
+import { LogOut, Loader2, Menu } from 'lucide-react';
 
 // Adaptadores: convierte tipos de Supabase a tipos del frontend
 function adaptarSolicitud(s: any, dominios: Dominio[]): ITRequest {
@@ -68,7 +68,7 @@ export default function App() {
 
     // Redirigir a Dashboard si un Colaborador intenta acceder a Admin
     const vistaSegura: ViewMode = !esAdministrador && currentView === 'Admin' ? 'Dashboard' : currentView;
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 768);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRequest, setEditingRequest] = useState<ITRequest | null>(null);
     const [historialFechas, setHistorialFechas] = useState<SolicitudFecha[]>([]);
@@ -431,19 +431,34 @@ export default function App() {
             />
 
             <main
-                className={`flex-1 p-6 h-full flex flex-col overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-20'}`}
+                className={`flex-1 p-4 md:p-6 h-full flex flex-col overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-20'} ml-0`}
             >
-                <header className="mb-4 flex-shrink-0 flex items-start justify-between">
-                    <div>
-                        <h2 className="text-2xl font-bold text-slate-800 tracking-tight">
-                            {vistaSegura === 'Dashboard' && 'Tablero Unificado de Tareas'}
-                            {vistaSegura === 'Tareas' && 'Gestor de Tareas Kanban'}
-                            {vistaSegura === 'Calendario' && 'Calendario de Actividades Críticas'}
-                            {vistaSegura === 'Admin' && 'Administración del Sistema'}
-                            {vistaSegura === 'Reports' && 'Reportes y Analítica'}
-                            {vistaSegura === 'Integrations' && 'Importación y Exportación'}
-                        </h2>
-                        <p className="text-sm text-slate-500">
+                {/* Overlay for mobile sidebar */}
+                {isSidebarOpen && (
+                    <div 
+                        className="md:hidden fixed inset-0 bg-slate-900/50 z-40" 
+                        onClick={() => setIsSidebarOpen(false)}
+                    />
+                )}
+
+                <header className="mb-4 flex-shrink-0 flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            className="md:hidden p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-lg transition-colors"
+                        >
+                            <Menu size={24} />
+                        </button>
+                        <div>
+                            <h2 className="text-xl md:text-2xl font-bold text-slate-800 tracking-tight">
+                                {vistaSegura === 'Dashboard' && 'Tablero Unificado de Tareas'}
+                                {vistaSegura === 'Tareas' && 'Gestor de Tareas Kanban'}
+                                {vistaSegura === 'Calendario' && 'Calendario de Actividades Críticas'}
+                                {vistaSegura === 'Admin' && 'Administración del Sistema'}
+                                {vistaSegura === 'Reports' && 'Reportes y Analítica'}
+                                {vistaSegura === 'Integrations' && 'Importación y Exportación'}
+                            </h2>
+                            <p className="text-sm text-slate-500 hidden sm:block">
                             {vistaSegura === 'Dashboard' && (
                                 cargando
                                     ? 'Cargando solicitudes...'
@@ -455,10 +470,11 @@ export default function App() {
                             {vistaSegura === 'Reports' && 'Visualizar carga de trabajo y rendimiento.'}
                             {vistaSegura === 'Integrations' && 'Carga masiva y descarga de reportes.'}
                         </p>
+                        </div>
                     </div>
 
                     {/* User info + logout */}
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-between w-full md:w-auto gap-4">
                         <NotificationBell
                             requests={requests}
                             onNotificationClick={(id) => {
