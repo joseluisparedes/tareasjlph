@@ -92,8 +92,19 @@ export interface Tarea {
     orden: number;
     creado_por: string | null;
     iniciativa_id: string | null;
+    responsable_id: string | null;
+    fecha_asignacion: string | null;
     fecha_creacion: string;
     fecha_actualizacion: string;
+}
+
+export interface TareaLog {
+    id: string;
+    tarea_id: string;
+    fecha: string;
+    cambiado_por: string | null;
+    anterior_responsable_id: string | null;
+    nuevo_responsable_id: string | null;
 }
 
 export interface Database {
@@ -133,6 +144,11 @@ export interface Database {
                 Row: Tarea;
                 Insert: Omit<Tarea, 'id' | 'fecha_creacion' | 'fecha_actualizacion'>;
                 Update: Partial<Omit<Tarea, 'id' | 'fecha_creacion' | 'fecha_actualizacion'>>;
+            };
+            tareas_logs: {
+                Row: TareaLog;
+                Insert: Omit<TareaLog, 'id' | 'fecha'>;
+                Update: Partial<Omit<TareaLog, 'id' | 'fecha'>>;
             };
         };
     };

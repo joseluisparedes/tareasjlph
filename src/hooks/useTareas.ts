@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase/cliente';
-import type { Tarea, TareaColumna } from '../lib/supabase/tipos-bd';
+import type { Tarea, TareaColumna, TareaLog } from '../lib/supabase/tipos-bd';
 import { useAuth } from './useAuth';
+import * as XLSX from 'xlsx';
 
 const sortTareas = (tareas: Tarea[]) => {
     const pesos = { 'Rojo': 1, 'Amarillo': 2, 'Verde': 3 } as Record<string, number>;
@@ -24,11 +25,6 @@ export function useTareas() {
             if (!silencioso) setCargando(true);
             let tareasQuery = supabase.from('tareas').select('*').order('orden', { ascending: true });
             let colsQuery = supabase.from('tareas_columnas').select('*').order('orden', { ascending: true });
-
-            if (user) {
-                tareasQuery = tareasQuery.eq('creado_por', user.id);
-                colsQuery = colsQuery.eq('creado_por', user.id);
-            }
 
             const [colsResponse, tareasResponse] = await Promise.all([
                 colsQuery,
@@ -108,12 +104,21 @@ export function useTareas() {
     };
 
     const eliminarColumna = async (id: string) => {
+        // Actualización optimista: removemos de la UI inmediatamente
+        setColumnas(prev => prev.filter(c => c.id !== id));
+        // También removemos las tareas de esa columna para mantener consistencia visual
+        setTareas(prev => prev.filter(t => t.columna_id !== id));
+
         const { error } = await supabase
             .from('tareas_columnas')
             .delete()
             .eq('id', id);
 
-        if (error) throw error;
+        if (error) {
+            console.error('Error al eliminar columna:', error);
+            cargarDatos(); // Revertir en caso de error
+            throw error;
+        }
     };
 
     const reordenarColumnas = async (ordenes: { id: string; orden: number }[]) => {
@@ -147,6 +152,8 @@ export function useTareas() {
             origen: 'manual',
             orden,
             creado_por: user?.id || null,
+            responsable_id: user?.id || null, // Por defecto el creador
+            fecha_asignacion: new Date().toISOString(),
             fecha_creacion: new Date().toISOString(),
             fecha_actualizacion: new Date().toISOString(),
         };
@@ -163,7 +170,9 @@ export function useTareas() {
                 urgencia,
                 origen: 'manual',
                 orden,
-                creado_por: user?.id
+                creado_por: user?.id,
+                responsable_id: user?.id,
+                fecha_asignacion: new Date().toISOString()
             }])
             .select()
             .single();
@@ -192,6 +201,19 @@ export function useTareas() {
         if (error) {
             cargarDatos();
             throw error;
+        }
+
+        // Si cambió el responsable, registrar en el log
+        if (datos.responsable_id) {
+            const tareaOriginal = tareas.find(t => t.id === id);
+            if (tareaOriginal && tareaOriginal.responsable_id !== datos.responsable_id) {
+                await supabase.from('tareas_logs').insert([{
+                    tarea_id: id,
+                    cambiado_por: user?.id,
+                    anterior_responsable_id: tareaOriginal.responsable_id,
+                    nuevo_responsable_id: datos.responsable_id
+                }]);
+            }
         }
     };
 
@@ -249,6 +271,43 @@ export function useTareas() {
         }
     };
 
+    const obtenerLogsTarea = async (tareaId: string): Promise<TareaLog[]> => {
+        const { data, error } = await supabase
+            .from('tareas_logs')
+            .select('*')
+            .eq('tarea_id', tareaId)
+            .order('fecha', { ascending: false });
+        
+        if (error) throw error;
+        return data || [];
+    };
+
+    const exportarAExcel = (columnasActuales: TareaColumna[], tareasActuales: Tarea[], usuarios: any[]) => {
+        const data = tareasActuales.map(t => {
+            const col = columnasActuales.find(c => c.id === t.columna_id);
+            const resp = usuarios.find(u => u.id === t.responsable_id);
+            const creator = usuarios.find(u => u.id === t.creado_por);
+            
+            return {
+                'Título': t.titulo,
+                'Descripción': t.descripcion,
+                'Columna': col?.nombre || 'Sin columna',
+                'Urgencia': t.urgencia,
+                'Estado': t.estado,
+                'Responsable': resp?.nombre_completo || t.responsable_id,
+                'Creado Por': creator?.nombre_completo || t.creado_por,
+                'Fecha Registro': new Date(t.fecha_creacion).toLocaleString(),
+                'Fecha Asignación': t.fecha_asignacion ? new Date(t.fecha_asignacion).toLocaleString() : 'N/A',
+                'Última Actualización': new Date(t.fecha_actualizacion).toLocaleString()
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Tareas Kanban");
+        XLSX.writeFile(wb, `Kanban_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+    };
+
     return {
         tareas,
         columnas,
@@ -262,6 +321,8 @@ export function useTareas() {
         eliminarTarea,
         moverTarea,
         duplicarTarea,
+        obtenerLogsTarea,
+        exportarAExcel,
         recargar: cargarDatos,
     };
 }

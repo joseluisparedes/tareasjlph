@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { Tarea } from '../../lib/supabase/tipos-bd';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { CheckCircle2, Copy, Mail, FileText } from 'lucide-react';
+import { CheckCircle2, Copy, Mail, FileText, History, User } from 'lucide-react';
 import { ConfirmModal } from '../shared/ConfirmModal';
+import { useAuth } from '../../hooks/useAuth';
 
 interface TarjetaTareaProps {
     tarea: Tarea;
@@ -11,7 +12,10 @@ interface TarjetaTareaProps {
     onFinalize: (id: string) => void;
     onDuplicate?: (tarea: Tarea) => void;
     onRegisterInitiative?: (tarea: Tarea) => void;
+    onViewLogs: (id: string) => void;
+    usuarios: any[];
     isOverlay?: boolean;
+    isMaster?: boolean;
 }
 
 const urgenciaColors = {
@@ -20,7 +24,18 @@ const urgenciaColors = {
     'Rojo': { bg: 'bg-red-100', text: 'text-red-800', border: 'border-red-200', label: 'Alto' }
 } as const;
 
-export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ tarea, onEdit, onFinalize, onDuplicate, onRegisterInitiative, isOverlay }) => {
+export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ 
+    tarea, 
+    onEdit, 
+    onFinalize, 
+    onDuplicate, 
+    onRegisterInitiative, 
+    onViewLogs,
+    usuarios = [],
+    isOverlay,
+    isMaster = false 
+}) => {
+    const { user } = useAuth();
     const {
         attributes,
         listeners,
@@ -28,7 +43,14 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ tarea, onEdit, onFin
         transform,
         transition,
         isDragging,
-    } = useSortable({ id: tarea.id, data: { type: 'Tarea', columna_id: tarea.columna_id } });
+    } = useSortable({ 
+        id: tarea.id, 
+        data: { type: 'Tarea', columna_id: tarea.columna_id },
+        disabled: !(tarea.responsable_id === user?.id || isMaster)
+    });
+
+    const isResponsible = tarea.responsable_id === user?.id || isMaster;
+    const responsable = usuarios.find(u => u.id === tarea.responsable_id);
 
     const [isFinalizeModalOpen, setFinalizeModalOpen] = useState(false);
 
@@ -69,40 +91,54 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ tarea, onEdit, onFin
                     )}
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10 bg-white/80 rounded-md backdrop-blur-sm">
-                    {onDuplicate && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onDuplicate(tarea);
-                            }}
-                            className="text-slate-400 hover:text-blue-600 p-1.5 rounded-md transition-colors hover:bg-blue-50"
-                            title="Duplicar tarea"
-                        >
-                            <Copy size={14} />
-                        </button>
-                    )}
-                    {onRegisterInitiative && !tarea.iniciativa_id && (
-                        <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onRegisterInitiative(tarea);
-                            }}
-                            className="text-slate-400 hover:text-teal-600 p-1.5 rounded-md transition-colors hover:bg-teal-50"
-                            title="Registrar Iniciativa"
-                        >
-                            <FileText size={14} />
-                        </button>
-                    )}
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
-                            setFinalizeModalOpen(true);
+                            onViewLogs(tarea.id);
                         }}
-                        className="text-slate-400 hover:text-green-600 p-1.5 rounded-md transition-colors hover:bg-green-50"
-                        title="Tarea terminada"
+                        className="text-slate-400 hover:text-blue-500 p-1.5 rounded-md transition-colors hover:bg-blue-50"
+                        title="Ver historial de cambios"
                     >
-                        <CheckCircle2 size={16} />
+                        <History size={14} />
                     </button>
+                    {isResponsible && (
+                        <>
+                            {onDuplicate && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onDuplicate(tarea);
+                                    }}
+                                    className="text-slate-400 hover:text-blue-600 p-1.5 rounded-md transition-colors hover:bg-blue-50"
+                                    title="Duplicar tarea"
+                                >
+                                    <Copy size={14} />
+                                </button>
+                            )}
+                            {onRegisterInitiative && !tarea.iniciativa_id && (
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        onRegisterInitiative(tarea);
+                                    }}
+                                    className="text-slate-400 hover:text-teal-600 p-1.5 rounded-md transition-colors hover:bg-teal-50"
+                                    title="Registrar Iniciativa"
+                                >
+                                    <FileText size={14} />
+                                </button>
+                            )}
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setFinalizeModalOpen(true);
+                                }}
+                                className="text-slate-400 hover:text-green-600 p-1.5 rounded-md transition-colors hover:bg-green-50"
+                                title="Tarea terminada"
+                            >
+                                <CheckCircle2 size={16} />
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
             
@@ -115,10 +151,22 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({ tarea, onEdit, onFin
                 </h4>
 
                 {tarea.descripcion && (
-                    <p className="text-xs text-slate-500 line-clamp-2 mb-2">
+                    <p className="text-xs text-slate-500 line-clamp-2 mb-3">
                         {tarea.descripcion}
                     </p>
                 )}
+
+                <div className="flex items-center gap-2 mt-auto pt-2 border-t border-slate-50">
+                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">
+                        <User size={10} />
+                    </div>
+                    <span className="text-[10px] font-medium text-slate-500 truncate">
+                        {responsable?.nombre_completo || 'Sin asignar'}
+                    </span>
+                    {!isResponsible && (
+                        <span className="ml-auto text-[9px] font-bold text-slate-300 uppercase tracking-tighter">Lectura</span>
+                    )}
+                </div>
             </div>
             
             <ConfirmModal 

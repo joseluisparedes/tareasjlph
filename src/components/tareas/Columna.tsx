@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { Tarea, TareaColumna } from '../../lib/supabase/tipos-bd';
-import { useSortable } from '@dnd-kit/sortable';
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { useSortable, SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { TarjetaTarea } from './TarjetaTarea';
 import { MoreVertical, Edit2, Trash2, Plus, Lock } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
 interface ColumnaProps {
     columna: TareaColumna;
@@ -16,6 +16,9 @@ interface ColumnaProps {
     onEditTarea: (tarea: Tarea) => void;
     onDuplicateTarea: (tarea: Tarea) => void;
     onRegisterInitiative?: (tarea: Tarea) => void;
+    onViewLogs: (tareaId: string) => void;
+    usuarios: any[];
+    isMaster?: boolean;
 }
 
 export const Columna: React.FC<ColumnaProps> = ({ 
@@ -27,8 +30,12 @@ export const Columna: React.FC<ColumnaProps> = ({
     onAddTarea,
     onEditTarea,
     onDuplicateTarea,
-    onRegisterInitiative
+    onRegisterInitiative,
+    onViewLogs,
+    usuarios = [],
+    isMaster = false
 }) => {
+    const { user } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
     const [editName, setEditName] = useState(columna.nombre);
     const [showMenu, setShowMenu] = useState(false);
@@ -36,6 +43,11 @@ export const Columna: React.FC<ColumnaProps> = ({
     const isProtected = import.meta.env.VITE_TODO_COLUMN_ID 
         ? import.meta.env.VITE_TODO_COLUMN_ID === columna.id 
         : columna.nombre.trim().toUpperCase() === 'TO DO';
+
+    const isOwner = columna.creado_por === user?.id || isMaster;
+
+    // Si es protegida y NO soy el dueño ni master, NO renderizar nada (oculto)
+    if (isProtected && !isOwner) return null;
 
     const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
         id: columna.id,
@@ -88,38 +100,40 @@ export const Columna: React.FC<ColumnaProps> = ({
                         </span>
                     </h3>
                 )}
-                <div className="relative" onPointerDown={e => e.stopPropagation()}>
-                    <button 
-                        onClick={() => setShowMenu(!showMenu)}
-                        className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200"
-                    >
-                        <MoreVertical size={16} />
-                    </button>
-                    
-                    {showMenu && (
-                        <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 w-36 z-20">
-                            <button 
-                                onClick={() => { setIsEditing(true); setShowMenu(false); }}
-                                className="w-full text-left px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2"
-                            >
-                                <Edit2 size={14} /> Editar
-                            </button>
-                            {!isProtected && (
+                {isOwner && (
+                    <div className="relative" onPointerDown={e => e.stopPropagation()}>
+                        <button 
+                            onClick={() => setShowMenu(!showMenu)}
+                            className="p-1 rounded text-slate-400 hover:text-slate-600 hover:bg-slate-200"
+                        >
+                            <MoreVertical size={16} />
+                        </button>
+                        
+                        {showMenu && (
+                            <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 w-36 z-20">
                                 <button 
-                                    onClick={() => {
-                                        if(window.confirm('¿Eliminar esta columna y sus tareas?')) {
-                                            onDeleteColumna(columna.id);
-                                        }
-                                        setShowMenu(false);
-                                    }}
-                                    className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                    onClick={() => { setIsEditing(true); setShowMenu(false); }}
+                                    className="w-full text-left px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2"
                                 >
-                                    <Trash2 size={14} /> Eliminar
+                                    <Edit2 size={14} /> Editar
                                 </button>
-                            )}
-                        </div>
-                    )}
-                </div>
+                                {!isProtected && (
+                                    <button 
+                                        onClick={() => {
+                                            if(window.confirm('¿Eliminar esta columna y sus tareas?')) {
+                                                onDeleteColumna(columna.id);
+                                            }
+                                            setShowMenu(false);
+                                        }}
+                                        className="w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                                    >
+                                        <Trash2 size={14} /> Eliminar
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div className="p-2 flex-1 overflow-y-auto min-h-[100px]">
@@ -132,16 +146,21 @@ export const Columna: React.FC<ColumnaProps> = ({
                             onEdit={onEditTarea}
                             onDuplicate={onDuplicateTarea}
                             onRegisterInitiative={onRegisterInitiative}
+                            onViewLogs={onViewLogs}
+                            usuarios={usuarios}
+                            isMaster={isMaster}
                         />
                     ))}
                 </SortableContext>
                 
-                <button 
-                    onClick={() => onAddTarea(columna.id)}
-                    className="w-full mt-2 flex items-center justify-center gap-1 py-2 text-sm text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent border-dashed hover:border-blue-200"
-                >
-                    <Plus size={16} /> Añadir Tarjeta
-                </button>
+                {isOwner && (
+                    <button 
+                        onClick={() => onAddTarea(columna.id)}
+                        className="w-full mt-2 flex items-center justify-center gap-1 py-2 text-sm text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent border-dashed hover:border-blue-200"
+                    >
+                        <Plus size={16} /> Añadir Tarjeta
+                    </button>
+                )}
             </div>
         </div>
     );

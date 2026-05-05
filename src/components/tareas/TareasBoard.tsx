@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useTareas } from '../../hooks/useTareas';
+import { useUsuarios } from '../../hooks/useUsuarios';
 import { Columna } from './Columna';
 import { TarjetaTarea } from './TarjetaTarea';
-import { Plus, Loader2, Mail, Trash2, FileText, Eye, Sparkles } from 'lucide-react';
+import { Plus, Loader2, Mail, Trash2, FileText, Eye, Sparkles, Download, User, History, Filter } from 'lucide-react';
 import { RequestModal } from '../dashboard/RequestModal';
 import { useCatalogos } from '../../hooks/useCatalogos';
 import { useDominios } from '../../hooks/useDominios';
@@ -46,14 +47,19 @@ export const TareasBoard: React.FC = () => {
         eliminarTarea,
         moverTarea,
         duplicarTarea,
-        reordenarColumnas
+        reordenarColumnas,
+        exportarAExcel,
+        obtenerLogsTarea
     } = useTareas();
+    const { usuarios } = useUsuarios();
 
     const { catalogos } = useCatalogos();
     const { dominios } = useDominios();
     const { crearSolicitud, solicitudes } = useSolicitudes();
     const { getModo } = useCatalogoConfig();
     const { user } = useAuth();
+    
+    const isMaster = user?.email === 'jose241100@gmail.com';
 
     const domainsForModal = dominios.map(d => ({ id: d.id, name: d.nombre, isActive: d.esta_activo }));
 
@@ -151,7 +157,15 @@ export const TareasBoard: React.FC = () => {
     // Edit Modal State
     const [isEditModalOpen, setEditModalOpen] = useState(false);
     const [editingTarea, setEditingTarea] = useState<Tarea | null>(null);
-    const [editForm, setEditForm] = useState({ titulo: '', descripcion: '', urgencia: 'Verde' as any });
+    const [editForm, setEditForm] = useState({ 
+        titulo: '', 
+        descripcion: '', 
+        urgencia: 'Verde' as any,
+        responsable_id: '' as string | null
+    });
+
+    const [isLogModalOpen, setLogModalOpen] = useState(false);
+    const [tareaLogs, setTareaLogs] = useState<any[]>([]);
 
     // Modals for Create
     const [isCreateColModalOpen, setCreateColModalOpen] = useState(false);
@@ -172,6 +186,7 @@ export const TareasBoard: React.FC = () => {
     // ...
     const [searchTerm, setSearchTerm] = useState('');
     const [urgencyFilter, setUrgencyFilter] = useState<string>('Todas');
+    const [onlyMyTasks, setOnlyMyTasks] = useState(false);
 
     React.useEffect(() => {
         // Enforce filters on local mapping without destroying real positions
@@ -179,10 +194,11 @@ export const TareasBoard: React.FC = () => {
             const matchesSearch = t.titulo.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                   (t.descripcion?.toLowerCase() || '').includes(searchTerm.toLowerCase());
             const matchesUrgency = urgencyFilter === 'Todas' || t.urgencia === urgencyFilter;
-            return matchesSearch && matchesUrgency;
+            const matchesUser = !onlyMyTasks || t.responsable_id === user?.id;
+            return matchesSearch && matchesUrgency && matchesUser;
         });
         setLocalTareas(filtered);
-    }, [tareas, searchTerm, urgencyFilter]);
+    }, [tareas, searchTerm, urgencyFilter, onlyMyTasks, user?.id]);
 
     useEffect(() => {
         setLocalColumnas(columnas);
@@ -214,7 +230,7 @@ export const TareasBoard: React.FC = () => {
 
     const handleAddTarea = (columnaId: string) => {
         setTargetColId(columnaId);
-        setEditForm({ titulo: '', descripcion: '', urgencia: 'Verde' });
+        setEditForm({ titulo: '', descripcion: '', urgencia: 'Verde', responsable_id: user?.id || null });
         setCreateTareaModalOpen(true);
     };
 
@@ -231,8 +247,19 @@ export const TareasBoard: React.FC = () => {
 
     const abrirEditModal = (tarea: Tarea) => {
         setEditingTarea(tarea);
-        setEditForm({ titulo: tarea.titulo, descripcion: tarea.descripcion || '', urgencia: tarea.urgencia });
+        setEditForm({ 
+            titulo: tarea.titulo, 
+            descripcion: tarea.descripcion || '', 
+            urgencia: tarea.urgencia,
+            responsable_id: tarea.responsable_id
+        });
         setEditModalOpen(true);
+    };
+
+    const verLogs = async (tareaId: string) => {
+        const logs = await obtenerLogsTarea(tareaId);
+        setTareaLogs(logs);
+        setLogModalOpen(true);
     };
 
     const handleDeleteTarea = () => {
@@ -252,7 +279,8 @@ export const TareasBoard: React.FC = () => {
             await actualizarTarea(editingTarea.id, {
                 titulo: editForm.titulo.trim(),
                 descripcion: editForm.descripcion,
-                urgencia: editForm.urgencia
+                urgencia: editForm.urgencia,
+                responsable_id: editForm.responsable_id
             });
             setEditModalOpen(false);
         }
@@ -294,6 +322,14 @@ export const TareasBoard: React.FC = () => {
     // Drag and Drop Handlers
     const handleDragStart = (event: DragStartEvent) => {
         const { active } = event;
+        const item = active.data.current?.type === 'Tarea' ? localTareas.find(t => t.id === active.id) : null;
+        
+        const isOwner = active.data.current?.type === 'Columna' 
+            ? (columnas.find(c => c.id === active.id)?.creado_por === user?.id || isMaster)
+            : (item?.responsable_id === user?.id || isMaster);
+
+        if (!isOwner) return; // Prevent drag if not owner or master
+
         setActiveId(active.id as string);
         setActiveType(active.data.current?.type || 'Tarea');
     };
@@ -476,13 +512,44 @@ export const TareasBoard: React.FC = () => {
                     </select>
                 </div>
                 
-                <div className="ml-auto">
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={() => setOnlyMyTasks(!onlyMyTasks)}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                            onlyMyTasks 
+                                ? 'bg-blue-100 text-blue-700 border border-blue-200' 
+                                : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'
+                        }`}
+                    >
+                        <User size={16} />
+                        {onlyMyTasks ? 'Mis Tareas' : 'Todas las Tareas'}
+                    </button>
+
+                    <button
+                        onClick={() => {
+                            const visibleCols = columnas.filter(c => {
+                                const isProtected = import.meta.env.VITE_TODO_COLUMN_ID 
+                                    ? import.meta.env.VITE_TODO_COLUMN_ID === c.id 
+                                    : c.nombre.trim().toUpperCase() === 'TO DO';
+                                const isOwner = c.creado_por === user?.id || isMaster;
+                                return !isProtected || isOwner;
+                            });
+                            const visibleTasks = tareas.filter(t => visibleCols.some(c => c.id === t.columna_id));
+                            exportarAExcel(visibleCols, visibleTasks, usuarios);
+                        }}
+                        className="flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                        title="Exportar tablero (solo columnas visibles)"
+                    >
+                        <Download size={16} />
+                        Exportar
+                    </button>
+
                     <button
                         onClick={() => setIsAIModalOpen(true)}
                         className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-600 hover:to-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
                     >
                         <Sparkles size={18} />
-                        Revisar con IA
+                        IA
                     </button>
                 </div>
             </div>
@@ -508,6 +575,9 @@ export const TareasBoard: React.FC = () => {
                                 onEditTarea={abrirEditModal}
                                 onDuplicateTarea={duplicarTarea}
                                 onRegisterInitiative={handleRegisterInitiative}
+                                onViewLogs={verLogs}
+                                usuarios={usuarios}
+                                isMaster={isMaster}
                             />
                         ))}
                     </SortableContext>
@@ -526,12 +596,17 @@ export const TareasBoard: React.FC = () => {
             </DndContext>
 
             {/* Modal de edición */}
-            {isEditModalOpen && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
-                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center flex-shrink-0">
-                            <div className="flex items-center gap-3">
-                                <h3 className="font-semibold text-slate-800">Editar Tarea</h3>
+            {isEditModalOpen && (() => {
+                const canEdit = editingTarea ? (editingTarea.responsable_id === user?.id || isMaster) : true;
+                return (
+                    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">
+                            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center flex-shrink-0">
+                                <div className="flex items-center gap-3">
+                                    <h3 className="font-semibold text-slate-800">{canEdit ? 'Editar Tarea' : 'Detalle de Tarea'}</h3>
+                                    {!canEdit && (
+                                        <span className="text-[10px] px-2 py-0.5 rounded-md font-bold bg-slate-200 text-slate-500 uppercase tracking-tighter">Solo Lectura</span>
+                                    )}
                                 {editingTarea?.origen === 'integracion' && (
                                     <span className="text-[11px] px-2 py-0.5 rounded-md font-medium bg-indigo-100 text-indigo-700 flex items-center gap-1" title="Automático desde Outlook">
                                         <Mail size={12} /> Integración Outlook
@@ -544,23 +619,44 @@ export const TareasBoard: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Título</label>
                                 <input 
-                                    className="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border" 
+                                    className="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border disabled:bg-slate-50 disabled:text-slate-500" 
                                     value={editForm.titulo}
                                     onChange={e => setEditForm({...editForm, titulo: e.target.value})}
+                                    disabled={!canEdit}
                                 />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Descripción</label>
                                 <textarea 
-                                    className="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border min-h-[100px]" 
+                                    className="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border min-h-[100px] disabled:bg-slate-50 disabled:text-slate-500" 
                                     rows={4}
                                     value={editForm.descripcion}
                                     onChange={e => setEditForm({...editForm, descripcion: e.target.value})}
+                                    disabled={!canEdit}
                                 />
                             </div>
-                            <div>
+                            <div className={!canEdit ? 'pointer-events-none opacity-80' : ''}>
                                 <label className="block text-sm font-medium text-slate-700 mb-2">Urgencia</label>
                                 <UrgencyToggle selected={editForm.urgencia} onChange={(u) => setEditForm({...editForm, urgencia: u})} />
+                            </div>
+
+                            <div className={!canEdit ? 'pointer-events-none opacity-80' : ''}>
+                                <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                                    <User size={14} className="text-blue-500" />
+                                    Persona Responsable
+                                </label>
+                                <select 
+                                    className="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                                    value={editForm.responsable_id || ''}
+                                    onChange={e => setEditForm({...editForm, responsable_id: e.target.value || null})}
+                                    disabled={!canEdit}
+                                >
+                                    <option value="">Sin asignar</option>
+                                    {usuarios.map(u => (
+                                        <option key={u.id} value={u.id}>{u.nombre_completo}</option>
+                                    ))}
+                                </select>
+                                {canEdit && <p className="text-[10px] text-slate-400 mt-1">El responsable es el único que puede mover o editar esta tarea (excepto Administradores).</p>}
                             </div>
 
                             {/* Initiative Section */}
@@ -594,17 +690,22 @@ export const TareasBoard: React.FC = () => {
                             )}
                         </div>
                         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center flex-shrink-0">
-                            <button onClick={handleDeleteTarea} className="text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors">
-                                Eliminar Tarea
-                            </button>
+                            {canEdit ? (
+                                <button onClick={handleDeleteTarea} className="text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-lg transition-colors">
+                                    Eliminar Tarea
+                                </button>
+                            ) : <div />}
                             <div className="flex gap-3">
-                                <button onClick={() => setEditModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-lg transition-colors">Cancelar</button>
-                                <button onClick={guardarEdicion} disabled={!editForm.titulo.trim()} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors shadow-sm">Guardar Cambios</button>
+                                <button onClick={() => setEditModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-lg transition-colors">Cerrar</button>
+                                {canEdit && (
+                                    <button onClick={guardarEdicion} disabled={!editForm.titulo.trim()} className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors shadow-sm">Guardar Cambios</button>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
-            )}
+                );
+            })()}
 
             {/* Modal Crear Columna */}
             {isCreateColModalOpen && (
@@ -701,6 +802,58 @@ export const TareasBoard: React.FC = () => {
                                     Sí, eliminar
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Logs */}
+            {isLogModalOpen && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[80vh]">
+                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+                            <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                                <History size={18} className="text-blue-500" />
+                                Historial de Responsables
+                            </h3>
+                            <button onClick={() => setLogModalOpen(false)} className="text-slate-400 hover:text-slate-600">&times;</button>
+                        </div>
+                        <div className="p-6 overflow-y-auto">
+                            {tareaLogs.length === 0 ? (
+                                <p className="text-center text-slate-400 py-8">No hay cambios registrados en esta tarea.</p>
+                            ) : (
+                                <div className="space-y-6">
+                                    {tareaLogs.map((log) => {
+                                        const autor = usuarios.find(u => u.id === log.cambiado_por);
+                                        const anterior = usuarios.find(u => u.id === log.anterior_responsable_id);
+                                        const nuevo = usuarios.find(u => u.id === log.nuevo_responsable_id);
+                                        return (
+                                            <div key={log.id} className="flex gap-4 relative">
+                                                <div className="w-1.5 bg-blue-100 rounded-full my-1"></div>
+                                                <div className="flex-1">
+                                                    <div className="flex justify-between items-start mb-1">
+                                                        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                                            {new Date(log.fecha).toLocaleString()}
+                                                        </span>
+                                                        <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded">
+                                                            por {autor?.nombre_completo || 'Sistema'}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-sm text-slate-600">
+                                                        Cambio de responsable: <br/>
+                                                        <span className="font-medium text-slate-400 strike-through line-through">{anterior?.nombre_completo || 'Sin asignar'}</span>
+                                                        <span className="mx-2 text-blue-500 font-bold">→</span>
+                                                        <span className="font-bold text-slate-800">{nuevo?.nombre_completo || 'Sin asignar'}</span>
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+                            <button onClick={() => setLogModalOpen(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 bg-slate-100 rounded-lg transition-colors">Cerrar</button>
                         </div>
                     </div>
                 </div>
