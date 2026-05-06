@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, AlertTriangle, Calendar, Clock, AlertCircle } from 'lucide-react';
-import { ITRequest } from '../../types';
+import { Bell, AlertTriangle, Calendar, Clock, AlertCircle, Info } from 'lucide-react';
+import { ITRequest, ActividadCalendario } from '../../types';
 
 interface NotificationBellProps {
     requests: ITRequest[];
+    actividades: ActividadCalendario[];
     onNotificationClick: (requestId: string) => void;
+    onActivityClick?: (actividad: ActividadCalendario) => void;
 }
 
 interface AlertGroup {
@@ -14,12 +16,18 @@ interface AlertGroup {
         id: string;
         message: string;
         requestId?: string;
+        actividad?: ActividadCalendario;
     }[];
-    type: 'danger' | 'warning' | 'info';
+    type: 'danger' | 'warning' | 'info' | 'critical';
     icon: React.ReactNode;
 }
 
-export const NotificationBell: React.FC<NotificationBellProps> = ({ requests, onNotificationClick }) => {
+export const NotificationBell: React.FC<NotificationBellProps> = ({ 
+    requests, 
+    actividades, 
+    onNotificationClick,
+    onActivityClick 
+}) => {
     const [isOpen, setIsOpen] = useState(false);
     const [alerts, setAlerts] = useState<AlertGroup[]>([]);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -42,11 +50,17 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ requests, on
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
 
+        const afterTomorrow = new Date(today);
+        afterTomorrow.setDate(afterTomorrow.getDate() + 2);
+
         const parseDate = (dateStr?: string) => {
             if (!dateStr) return null;
             const parts = dateStr.split('-');
             if (parts.length !== 3) return null;
-            return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            // Usar UTC o ser consistente con la zona horaria
+            const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            d.setHours(0,0,0,0);
+            return d;
         };
 
         const isSameDay = (d1: Date | null, d2: Date) => {
@@ -65,6 +79,46 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ requests, on
         };
 
         const newAlerts: AlertGroup[] = [];
+
+        // --- 0. CALENDARIO: Procesos Críticos Próximos y Activos ---
+        const calendarItems = (actividades || []).filter(act => {
+            const fInicio = parseDate(act.fecha_inicio);
+            const fFin = parseDate(act.fecha_fin);
+            if (!fInicio) return false;
+            
+            // Si ya terminó, no mostrar
+            if (fFin && isPastDate(fFin, today)) return false;
+
+            // Mostrar si: Empieza hoy/mañana/pasado O si ya empezó y sigue vigente hoy
+            const hoyEstaActiva = fInicio <= today && (fFin ? fFin >= today : true);
+            const empiezaPronto = isSameDay(fInicio, tomorrow) || isSameDay(fInicio, afterTomorrow);
+
+            return hoyEstaActiva || empiezaPronto;
+        }).map(act => {
+            const fInicio = parseDate(act.fecha_inicio)!;
+            const fFin = parseDate(act.fecha_fin);
+            let tiempo = '';
+            
+            if (fInicio <= today && (fFin ? fFin >= today : true)) tiempo = 'está activa ahora';
+            else if (isSameDay(fInicio, tomorrow)) tiempo = 'empieza mañana';
+            else tiempo = 'empieza en 2 días';
+
+            return {
+                id: act.id,
+                message: `Calendario: "${act.descripcion}" ${tiempo}.`,
+                actividad: act
+            };
+        });
+
+        if (calendarItems.length > 0) {
+            newAlerts.push({
+                id: 'calendario',
+                title: 'Calendario: Próximas Actividades',
+                type: 'critical',
+                icon: <Calendar size={16} className="text-purple-600" />,
+                items: calendarItems
+            });
+        }
 
         // 1. Iniciativas Hoy (Inicio o Fin)
         const hoyItems = requests.filter(r => !isClosed(r.status)).filter(r => {
@@ -172,7 +226,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ requests, on
         }
 
         setAlerts(newAlerts);
-    }, [requests]);
+    }, [requests, actividades]);
 
     const totalNotifications = alerts.reduce((acc, alert) => acc + alert.items.length, 0);
 
@@ -230,6 +284,19 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({ requests, on
                                                         >
                                                             <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${group.type === 'danger' ? 'bg-red-500' : group.type === 'warning' ? 'bg-orange-400' : 'bg-blue-500'}`} />
                                                             <span className="group-hover:text-blue-600 transition-colors leading-tight">
+                                                                {item.message}
+                                                            </span>
+                                                        </button>
+                                                    ) : item.actividad ? (
+                                                        <button
+                                                            onClick={() => {
+                                                                setIsOpen(false);
+                                                                onActivityClick?.(item.actividad!);
+                                                            }}
+                                                            className="w-full text-left p-2 rounded-lg text-sm text-slate-600 hover:bg-slate-50 border border-transparent hover:border-slate-200 transition-all flex items-start gap-2 group"
+                                                        >
+                                                            <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 bg-purple-500`} />
+                                                            <span className="group-hover:text-purple-600 transition-colors leading-tight">
                                                                 {item.message}
                                                             </span>
                                                         </button>

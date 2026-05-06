@@ -8,6 +8,7 @@ import { BulkOperations } from './components/dashboard/BulkOperations';
 import { AuthPage } from './components/auth/AuthPage';
 import { TareasModule } from './components/tareas/TareasModule';
 import { CalendarioModule } from './components/calendario/CalendarioModule';
+import { CriticalAlerts } from './components/dashboard/CriticalAlerts';
 import { ConfirmModal } from './components/shared/ConfirmModal';
 import { NotificationBell } from './components/shared/NotificationBell';
 import { ITRequest, ViewMode, CatalogItem, RequestType, Urgency, Status } from './types';
@@ -16,6 +17,7 @@ import { useDominios } from './hooks/useDominios';
 import { useCatalogos } from './hooks/useCatalogos';
 import { useCatalogoConfig } from './hooks/useCatalogoConfig';
 import { useAuth } from './hooks/useAuth';
+import { useCalendario } from './hooks/useCalendario';
 import type { Solicitud, Dominio, SolicitudFecha } from './lib/supabase/tipos-bd';
 import type { CatalogType } from './types';
 import { fechasApi } from './lib/api/fechas';
@@ -98,6 +100,8 @@ export default function App() {
         eliminarItem: eliminarCatalogo,
     } = useCatalogos();
 
+    const { actividades } = useCalendario();
+
     const { getModo, setModo } = useCatalogoConfig();
 
     const handleDeleteRequest = (id: string) => {
@@ -106,9 +110,22 @@ export default function App() {
 
     const confirmDeleteRequest = async () => {
         if (!deleteConfirmId) return;
-        await eliminarSolicitud(deleteConfirmId);
-        setIsModalOpen(false);
-        setDeleteConfirmId(null);
+        try {
+            await eliminarSolicitud(deleteConfirmId);
+            setIsModalOpen(false);
+            setDeleteConfirmId(null);
+        } catch (e: any) {
+            alert(`Error al eliminar solicitud: ${e.message}`);
+        }
+    };
+
+    const handleRLSError = (e: any, context: string) => {
+        console.error(`Error en ${context}:`, e);
+        if (e.message?.includes('row-level security policy')) {
+            alert(`Acceso Denegado: No tienes permisos suficientes para ${context}. Solo los administradores pueden realizar esta acción.`);
+        } else {
+            alert(`Error inesperado al ${context}: ${e.message || 'Desconocido'}`);
+        }
     };
 
     // Pantalla de carga inicial
@@ -285,14 +302,22 @@ export default function App() {
     };
 
     const handleUpdateDomain = async (updatedDomain: CatalogItem) => {
-        await actualizarDominio(updatedDomain.id, {
-            nombre: updatedDomain.name,
-            esta_activo: updatedDomain.isActive,
-        });
+        try {
+            await actualizarDominio(updatedDomain.id, {
+                nombre: updatedDomain.name,
+                esta_activo: updatedDomain.isActive,
+            });
+        } catch (e) {
+            handleRLSError(e, 'actualizar el dominio');
+        }
     };
 
     const handleAddDomain = async (name: string) => {
-        await crearDominio(name);
+        try {
+            await crearDominio(name);
+        } catch (e) {
+            handleRLSError(e, 'agregar el dominio');
+        }
     };
 
     const handleRequestStatusChange = async (requestId: string, newStatus: Status) => {
@@ -457,6 +482,7 @@ export default function App() {
                                 {vistaSegura === 'Admin' && 'Administración del Sistema'}
                                 {vistaSegura === 'Reports' && 'Reportes y Analítica'}
                                 {vistaSegura === 'Integrations' && 'Importación y Exportación'}
+                                {vistaSegura === 'Alertas' && 'Centro de Alertas Críticas'}
                             </h2>
                             <p className="text-sm text-slate-500 hidden sm:block">
                             {vistaSegura === 'Dashboard' && (
@@ -469,6 +495,7 @@ export default function App() {
                             {vistaSegura === 'Admin' && 'Configurar catálogos y usuarios.'}
                             {vistaSegura === 'Reports' && 'Visualizar carga de trabajo y rendimiento.'}
                             {vistaSegura === 'Integrations' && 'Carga masiva y descarga de reportes.'}
+                            {vistaSegura === 'Alertas' && 'Resumen de procesos que inician o vencen próximamente.'}
                         </p>
                         </div>
                     </div>
@@ -477,9 +504,13 @@ export default function App() {
                     <div className="flex items-center justify-between w-full md:w-auto gap-4">
                         <NotificationBell
                             requests={requests}
+                            actividades={actividades}
                             onNotificationClick={(id) => {
                                 const req = requests.find(r => r.id === id);
                                 if (req) handleEditRequest(req);
+                            }}
+                            onActivityClick={() => {
+                                setCurrentView('Calendario');
                             }}
                         />
                         <div className="text-right border-l border-slate-200 pl-4">
@@ -514,7 +545,7 @@ export default function App() {
                         </div>
                     </div>
                 ) : (
-                    <div className="flex-1 min-h-0 overflow-hidden pr-1 pb-4">
+                    <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-4 custom-scrollbar">
                         {vistaSegura === 'Dashboard' && (
                             <Dashboard
                                 requests={requests}
@@ -557,9 +588,27 @@ export default function App() {
                                 onUpdateDomain={handleUpdateDomain}
                                 onAddDomain={handleAddDomain}
                                 catalogos={catalogos}
-                                onAddCatalogo={(tipo: CatalogType, valor: string) => crearCatalogo(tipo, valor)}
-                                onUpdateCatalogo={actualizarCatalogo}
-                                onDeleteCatalogo={eliminarCatalogo}
+                                onAddCatalogo={async (tipo: CatalogType, valor: string) => {
+                                    try {
+                                        await crearCatalogo(tipo, valor);
+                                    } catch (e) {
+                                        handleRLSError(e, 'agregar al catálogo');
+                                    }
+                                }}
+                                onUpdateCatalogo={async (id, cambios) => {
+                                    try {
+                                        await actualizarCatalogo(id, cambios);
+                                    } catch (e) {
+                                        handleRLSError(e, 'actualizar el catálogo');
+                                    }
+                                }}
+                                onDeleteCatalogo={async (id) => {
+                                    try {
+                                        await eliminarCatalogo(id);
+                                    } catch (e) {
+                                        handleRLSError(e, 'eliminar del catálogo');
+                                    }
+                                }}
                                 getModo={getModo}
                                 setModo={setModo}
                                 requests={requests}
@@ -575,6 +624,14 @@ export default function App() {
                                 domains={domains}
                                 catalogos={catalogos}
                                 getModo={getModo}
+                            />
+                        )}
+                        {vistaSegura === 'Alertas' && (
+                            <CriticalAlerts 
+                                actividades={actividades}
+                                requests={requests}
+                                onActivityClick={() => setCurrentView('Calendario')}
+                                onIniciativaClick={(req) => handleEditRequest(req)}
                             />
                         )}
                     </div>

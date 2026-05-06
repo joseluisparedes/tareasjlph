@@ -121,18 +121,23 @@ export const CalendarioModule: React.FC = () => {
 
     const handleSaveActividad = async (act: Partial<ActividadCalendario>, colorConfig?: string) => {
         // Auto-crear catálogo si no existe
-        let catId = '';
-        const itemCat = tiposActividad.find(t => t.valor === act.tipo_actividad);
-        
-        if (act.tipo_actividad && !itemCat) {
-            const nuevoItem = await crearItem('tipo_actividad_calendario', act.tipo_actividad);
-            catId = nuevoItem.id;
-        } else if (itemCat) {
-            catId = itemCat.id;
-        }
-        
-        if (catId && colorConfig && colorConfig !== itemCat?.color) {
-            await actualizarItem(catId, { color: colorConfig });
+        try {
+            let catId = '';
+            const itemCat = tiposActividad.find(t => t.valor === act.tipo_actividad);
+            
+            if (act.tipo_actividad && !itemCat) {
+                const nuevoItem = await crearItem('tipo_actividad_calendario', act.tipo_actividad);
+                catId = nuevoItem.id;
+            } else if (itemCat) {
+                catId = itemCat.id;
+            }
+            
+            if (catId && colorConfig && colorConfig !== itemCat?.color) {
+                await actualizarItem(catId, { color: colorConfig });
+            }
+        } catch (catErr) {
+            console.warn("No se pudo actualizar el catálogo (posible falta de permisos RLS):", catErr);
+            // Continuamos sin bloquear el guardado de la actividad principal
         }
         
         if (selectedActividad) {

@@ -98,7 +98,7 @@ export interface CatalogoConfig {
     modo_visualizacion: 'desplegable' | 'cuadros';
 }
 
-export type ViewMode = 'Dashboard' | 'Admin' | 'Reports' | 'Integrations' | 'Tareas' | 'Calendario';
+export type ViewMode = 'Dashboard' | 'Admin' | 'Reports' | 'Integrations' | 'Tareas' | 'Calendario' | 'Alertas';
 export type DashboardView = 'Kanban' | 'Table';
 
 export interface FilterState {
@@ -131,4 +131,15 @@ export interface ActividadCalendario {
     creado_por: string;
     creado_por_nombre?: string;
     fecha_creacion?: string;
+}
+
+export interface ActividadLog {
+    id: string;
+    actividad_id: string;
+    fecha_registro: string;
+    cambiado_por: string;
+    cambiado_por_nombre?: string;
+    campo_modificado: string;
+    valor_anterior: string;
+    valor_nuevo: string;
 }

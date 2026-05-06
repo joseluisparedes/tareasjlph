@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Trash2, Calendar, Clock, AlertTriangle, Tag, AlignLeft } from 'lucide-react';
-import { ActividadCalendario, CatalogoItem } from '../../types';
+import { X, Save, Trash2, Calendar, Clock, AlertTriangle, Tag, AlignLeft, User as UserIcon } from 'lucide-react';
+import { ActividadCalendario, CatalogoItem, ActividadLog } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
+import { calendarioLogsApi } from '../../lib/api/calendarioLogs';
 
 interface ActividadModalProps {
     isOpen: boolean;
@@ -22,9 +23,9 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({
     tiposActividad,
     fechaPreseleccionada
 }) => {
-    const { user } = useAuth();
+    const { user, perfil, esAdministrador } = useAuth();
     
-    const esSoloLectura = actividad ? (actividad.creado_por !== user?.id) : false;
+    const esSoloLectura = actividad ? (actividad.creado_por !== user?.id && !esAdministrador) : false;
 
     const [descripcion, setDescripcion] = useState('');
     const [tipoActividad, setTipoActividad] = useState('');
@@ -35,6 +36,9 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({
     const [fechaInicio, setFechaInicio] = useState('');
     const [fechaFin, setFechaFin] = useState('');
     
+    // Para detectar cambios
+    const [fechasOriginales, setFechasOriginales] = useState({ inicio: '', fin: '' });
+    
     // Horas en formato HH:mm (opcionales)
     const [usarHoras, setUsarHoras] = useState(false);
     const [horaInicio, setHoraInicio] = useState('');
@@ -43,13 +47,25 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({
     // Color selector for the Activity Type
     const [colorLocal, setColorLocal] = useState<string>('#94a3b8');
     
+    const [logs, setLogs] = useState<ActividadLog[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+
+    const cargarLogs = async (id: string) => {
+        try {
+            const data = await calendarioLogsApi.obtenerPorActividad(id);
+            setLogs(data);
+        } catch (e) {
+            console.error("Error cargando logs:", e);
+        }
+    };
 
     useEffect(() => {
         if (isOpen) {
             setError(null);
+            setLogs([]);
             if (actividad) {
+                cargarLogs(actividad.id);
                 setDescripcion(actividad.descripcion);
                 
                 // Verificar si el tipo de actividad está en el catálogo
@@ -68,6 +84,7 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({
 
                 setFechaInicio(actividad.fecha_inicio);
                 setFechaFin(actividad.fecha_fin);
+                setFechasOriginales({ inicio: actividad.fecha_inicio, fin: actividad.fecha_fin });
                 
                 if (actividad.hora_inicio || actividad.hora_fin) {
                     setUsarHoras(true);
@@ -83,6 +100,7 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({
                 setTipoActividad(tiposActividad[0]?.valor ?? '');
                 setTipoPersonalizado(false);
                 setNuevoTipo('');
+                setFechasOriginales({ inicio: '', fin: '' });
                 setColorLocal(tiposActividad[0]?.color || '#94a3b8');
                 
                 const hoy = fechaPreseleccionada || new Date().toISOString().split('T')[0];
@@ -97,6 +115,8 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({
     }, [isOpen, actividad, tiposActividad, fechaPreseleccionada]);
 
     if (!isOpen) return null;
+
+    const hayCambioFechas = actividad && (fechaInicio !== fechasOriginales.inicio || fechaFin !== fechasOriginales.fin);
 
     const handleSave = async () => {
         try {
@@ -141,9 +161,25 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({
             };
 
             await onSave(guardado, colorLocal);
+
+            // Registrar logs si hay cambios en fechas
+            if (actividad && user) {
+                if (fechaInicio !== fechasOriginales.inicio) {
+                    await calendarioLogsApi.registrar(actividad.id, user.id, 'Fecha Inicio', fechasOriginales.inicio, fechaInicio);
+                }
+                if (fechaFin !== fechasOriginales.fin) {
+                    await calendarioLogsApi.registrar(actividad.id, user.id, 'Fecha Fin', fechasOriginales.fin, fechaFin);
+                }
+            }
+
             onClose();
         } catch (e: any) {
-            setError(e.message || 'Error al guardar la actividad');
+            console.error("Error al guardar actividad:", e);
+            if (e.message?.includes('row-level security policy')) {
+                setError('Acceso denegado: No tienes permisos suficientes para guardar actividades en el calendario. Contacta al administrador.');
+            } else {
+                setError(e.message || 'Error inesperado al guardar la actividad');
+            }
         } finally {
             setIsSaving(false);
         }
@@ -174,9 +210,22 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({
                     {esSoloLectura && (
                         <div className="p-3 bg-blue-50 text-blue-700 text-sm rounded-lg flex items-start gap-2">
                             <AlertTriangle size={16} className="mt-0.5 shrink-0" />
-                            <span>No eres el creador de esta actividad, por lo que solo puedes visualizarla. Creado por: {actividad?.creado_por_nombre}</span>
+                            <span>No eres el creador de esta actividad, por lo que solo puedes visualizarla. Creado por: {actividad?.creado_por_nombre || 'Usuario'}</span>
                         </div>
                     )}
+
+                    {/* Información del Registrador (Visible para todos) */}
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                            <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center">
+                                <UserIcon size={12} className="text-slate-500" />
+                            </div>
+                            <span>Registrado por: <span className="text-slate-800">{actividad?.creado_por_nombre || perfil?.nombre_completo || 'Usuario'}</span></span>
+                        </div>
+                        {actividad?.fecha_creacion && (
+                            <span className="text-[10px] text-slate-400">Creado el: {new Date(actividad.fecha_creacion).toLocaleDateString()}</span>
+                        )}
+                    </div>
 
                     {/* Descripción */}
                     <div>
@@ -341,6 +390,29 @@ export const ActividadModal: React.FC<ActividadModalProps> = ({
                             </div>
                         )}
                     </div>
+                    {/* Historial de Cambios (Logs Reales) */}
+                    {actividad && logs.length > 0 && (
+                        <div className="mt-6 border-t border-slate-100 pt-5">
+                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <Clock size={14} /> Historial de Cambios
+                            </h4>
+                            <div className="space-y-3 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                                {logs.map(log => (
+                                    <div key={log.id} className="text-xs bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex flex-col gap-1">
+                                        <div className="flex justify-between items-center text-[10px]">
+                                            <span className="font-bold text-blue-600">{log.cambiado_por_nombre}</span>
+                                            <span className="text-slate-400">{new Date(log.fecha_registro).toLocaleString()}</span>
+                                        </div>
+                                        <div className="text-slate-600">
+                                            Cambió <span className="font-semibold text-slate-800">{log.campo_modificado}</span>:
+                                            <span className="line-through mx-1 opacity-50">{log.valor_anterior}</span>
+                                            <span className="text-green-600 font-medium">→ {log.valor_nuevo}</span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}

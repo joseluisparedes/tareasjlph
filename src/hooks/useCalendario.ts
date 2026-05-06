@@ -7,9 +7,9 @@ export function useCalendario() {
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const cargarActividades = async () => {
+    const cargarActividades = async (silencioso = false) => {
         try {
-            setCargando(true);
+            if (!silencioso) setCargando(true);
             const { data, error } = await supabase
                 .from('actividades_calendario')
                 .select(`*`)
@@ -39,7 +39,7 @@ export function useCalendario() {
             console.error('Error cargando actividades:', e.message);
             setError(e.message);
         } finally {
-            setCargando(false);
+            if (!silencioso) setCargando(false);
         }
     };
 
@@ -67,7 +67,7 @@ export function useCalendario() {
             throw error;
         }
 
-        await cargarActividades();
+        await cargarActividades(true);
         return data;
     };
 
@@ -90,7 +90,7 @@ export function useCalendario() {
             throw error;
         }
 
-        await cargarActividades();
+        await cargarActividades(true);
     };
 
     const eliminarActividad = async (id: string) => {
@@ -104,7 +104,7 @@ export function useCalendario() {
             throw error;
         }
 
-        await cargarActividades();
+        await cargarActividades(true);
     };
 
     return {
