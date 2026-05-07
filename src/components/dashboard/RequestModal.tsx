@@ -382,7 +382,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                                             onClick={() => handleLoadFavorite(fav)}
                                                             className="group flex items-center justify-between px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-md cursor-pointer"
                                                         >
-                                                            <span className="truncate pr-2">{fav.name}</span>
+                                                            <span className="truncate pr-2">{fav.nombre}</span>
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => handleDeleteFavorite(fav.id, e)}
