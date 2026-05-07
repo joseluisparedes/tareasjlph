@@ -18,6 +18,7 @@ import { useCatalogos } from './hooks/useCatalogos';
 import { useCatalogoConfig } from './hooks/useCatalogoConfig';
 import { useAuth } from './hooks/useAuth';
 import { useCalendario } from './hooks/useCalendario';
+import { useAppSettings } from './hooks/useAppSettings';
 import type { Solicitud, Dominio, SolicitudFecha } from './lib/supabase/tipos-bd';
 import type { CatalogType } from './types';
 import { fechasApi } from './lib/api/fechas';
@@ -53,6 +54,7 @@ function adaptarSolicitud(s: any, dominios: Dominio[]): ITRequest {
         tipoTarea: s.tipo_tarea ?? undefined,
         complejidad: s.complejidad ?? undefined,
         ingresadoGestionDemanda: s.ingresado_gestion_demanda ?? undefined,
+        ultimoCambioEstado: s.ultimo_cambio_estado ?? undefined,
     };
 }
 
@@ -103,6 +105,7 @@ export default function App() {
     const { actividades } = useCalendario();
 
     const { getModo, setModo } = useCatalogoConfig();
+    const { umbrales, actualizarUmbrales } = useAppSettings();
 
     const handleDeleteRequest = (id: string) => {
         setDeleteConfirmId(id);
@@ -573,6 +576,7 @@ export default function App() {
                                     }
                                 }}
                                 onUpdateRequest={handleUpdateRequest}
+                                umbrales={umbrales}
                             />
                         )}
                         {vistaSegura === 'Tareas' && (
@@ -612,6 +616,8 @@ export default function App() {
                                 getModo={getModo}
                                 setModo={setModo}
                                 requests={requests}
+                                umbrales={umbrales}
+                                onUpdateUmbrales={actualizarUmbrales}
                             />
                         )}
                         {vistaSegura === 'Reports' && (
@@ -632,6 +638,7 @@ export default function App() {
                                 requests={requests}
                                 onActivityClick={() => setCurrentView('Calendario')}
                                 onIniciativaClick={(req) => handleEditRequest(req)}
+                                umbrales={umbrales}
                             />
                         )}
                     </div>

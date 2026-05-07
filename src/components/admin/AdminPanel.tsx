@@ -21,7 +21,7 @@ interface AdminPanelProps {
     requests: ITRequest[];
 }
 
-type AdminTab = 'domains' | 'catalogs' | 'users';
+type AdminTab = 'domains' | 'catalogs' | 'users' | 'settings';
 
 const CATALOG_SECTIONS: { tipo: CatalogType; label: string }[] = [
     { tipo: 'tipo_requerimiento', label: 'Tipo de Requerimiento' },
@@ -275,8 +275,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     getModo, setModo, requests
 }) => {
     const { usuarios, cargando: cargandoUsuarios, actualizarUsuario, eliminarUsuario } = useUsuarios();
-    const { permitirRegistro, actualizarPermisoRegistro, cargando: cargandoSettings } = useAppSettings();
+    const { permitirRegistro, actualizarPermisoRegistro, umbrales, actualizarUmbrales, cargando: cargandoSettings } = useAppSettings();
     const [activeTab, setActiveTab] = useState<AdminTab>('domains');
+    
+    // Estados para umbrales temporales en el formulario
+    const [tempYellow, setTempYellow] = useState<number>(umbrales.yellow);
+    const [tempRed, setTempRed] = useState<number>(umbrales.red);
+
+    // Sincronizar umbrales cuando carguen
+    React.useEffect(() => {
+        setTempYellow(umbrales.yellow);
+        setTempRed(umbrales.red);
+    }, [umbrales]);
     const [isAddingDomain, setIsAddingDomain] = useState(false);
     const [newDomainName, setNewDomainName] = useState('');
     const [editingDomainId, setEditingDomainId] = useState<string | null>(null);
@@ -316,6 +326,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         { id: 'domains', label: 'Dominios TI' },
         { id: 'catalogs', label: 'Catálogos' },
         { id: 'users', label: 'Usuarios' },
+        { id: 'settings', label: 'Configuración' },
     ];
 
     return (
@@ -566,6 +577,108 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                     </table>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {/* ── TAB: Configuración ── */}
+                    {activeTab === 'settings' && (
+                        <div className="space-y-8">
+                            <div className="mb-5">
+                                <h3 className="font-semibold text-lg text-slate-800">Configuración General del Sistema</h3>
+                                <p className="text-sm text-slate-500 mt-1">
+                                    Ajusta parámetros globales que afectan el comportamiento y alertas de la aplicación.
+                                </p>
+                            </div>
+
+                            {/* Control de Registro Público */}
+                            <div className="p-5 bg-white border border-slate-200 rounded-xl flex items-center justify-between shadow-sm">
+                                <div>
+                                    <h4 className="font-semibold text-slate-800 flex items-center gap-2">
+                                        <Shield size={18} className="text-violet-600" />
+                                        Control de Registro Público
+                                    </h4>
+                                    <p className="text-sm text-slate-500 mt-1 max-w-xl">
+                                        Si está desactivado, se ocultará el formulario de "Crear Cuenta" en la pantalla de inicio de sesión.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className={`text-sm font-medium ${permitirRegistro ? 'text-green-600' : 'text-slate-500'}`}>
+                                        {cargandoSettings ? 'Cargando...' : permitirRegistro ? 'Habilitado' : 'Deshabilitado'}
+                                    </span>
+                                    <button
+                                        disabled={cargandoSettings}
+                                        onClick={() => actualizarPermisoRegistro(!permitirRegistro)}
+                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${permitirRegistro ? 'bg-green-500' : 'bg-slate-300'
+                                            }`}
+                                    >
+                                        <span
+                                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${permitirRegistro ? 'translate-x-6' : 'translate-x-1'
+                                                }`}
+                                        />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Semáforo de Tiempos */}
+                            <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-sm">
+                                <h4 className="font-semibold text-slate-800 flex items-center gap-2 mb-4">
+                                    <AlertTriangle size={18} className="text-amber-500" />
+                                    Umbrales del Semáforo de Tiempo
+                                </h4>
+                                <p className="text-sm text-slate-500 mb-6">
+                                    Define cuántos días puede estar una iniciativa en un mismo estado antes de cambiar de color en el semáforo visual.
+                                </p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-amber-400" />
+                                            Días para Alerta Amarilla
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                value={tempYellow}
+                                                onChange={(e) => setTempYellow(parseInt(e.target.value) || 1)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-red-500" />
+                                            Días para Alerta Roja (Crítica)
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="number"
+                                                min="2"
+                                                className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                value={tempRed}
+                                                onChange={(e) => setTempRed(parseInt(e.target.value) || 1)}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-8 flex justify-end">
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                await actualizarUmbrales(tempYellow, tempRed);
+                                                alert("Umbrales actualizados correctamente.");
+                                            } catch (e: any) {
+                                                alert("Error al actualizar umbrales: " + e.message);
+                                            }
+                                        }}
+                                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
+                                    >
+                                        <Save size={16} /> Guardar Configuración
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>

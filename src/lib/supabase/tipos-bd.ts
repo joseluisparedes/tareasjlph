@@ -26,6 +26,7 @@ export interface Solicitud {
     tipo_tarea: string | null;
     complejidad: string | null;
     ingresado_gestion_demanda: string | null;
+    ultimo_cambio_estado?: string | null;
 }
 
 export interface Dominio {
@@ -71,6 +72,24 @@ export interface SolicitudFecha {
     fecha: string;
     cambiado_por: string | null;
     fecha_registro: string;
+}
+
+export interface SolicitudStatusLog {
+    id: string;
+    solicitud_id: string;
+    estado: string;
+    fecha_entrada: string;
+    fecha_salida?: string | null;
+    creado_por: string | null;
+    fecha_creacion?: string;
+}
+
+export interface UsuarioFavorito {
+    id: string;
+    usuario_id: string;
+    nombre: string;
+    configuracion: any;
+    fecha_creacion: string;
 }
 
 export interface TareaColumna {
@@ -120,6 +139,11 @@ export interface Database {
                 Insert: Omit<SolicitudApunte, 'id' | 'fecha_creacion'>;
                 Update: Partial<Omit<SolicitudApunte, 'id' | 'fecha_creacion'>>;
             };
+            solicitud_status_log: {
+                Row: SolicitudStatusLog;
+                Insert: Omit<SolicitudStatusLog, 'id' | 'fecha_creacion'>;
+                Update: Partial<Omit<SolicitudStatusLog, 'id' | 'fecha_creacion'>>;
+            };
             dominios: {
                 Row: Dominio;
                 Insert: Omit<Dominio, 'id' | 'fecha_creacion' | 'fecha_actualizacion'>;
@@ -149,6 +173,11 @@ export interface Database {
                 Row: TareaLog;
                 Insert: Omit<TareaLog, 'id' | 'fecha'>;
                 Update: Partial<Omit<TareaLog, 'id' | 'fecha'>>;
+            };
+            usuario_favoritos: {
+                Row: UsuarioFavorito;
+                Insert: Omit<UsuarioFavorito, 'id' | 'fecha_creacion'>;
+                Update: Partial<Omit<UsuarioFavorito, 'id' | 'fecha_creacion'>>;
             };
         };
     };

@@ -236,7 +236,7 @@ export const TareasBoard: React.FC = () => {
 
     const submitCreateTarea = async () => {
         if (editForm.titulo.trim() && targetColId) {
-            await crearTarea(editForm.titulo.trim(), editForm.descripcion, targetColId, editForm.urgencia);
+            await crearTarea(editForm.titulo.trim(), editForm.descripcion, targetColId, editForm.urgencia, editForm.responsable_id);
             setCreateTareaModalOpen(false);
         }
     };
@@ -766,6 +766,23 @@ export const TareasBoard: React.FC = () => {
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-2">Urgencia</label>
                                 <UrgencyToggle selected={editForm.urgencia} onChange={(u) => setEditForm({...editForm, urgencia: u})} />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                                    <User size={14} className="text-blue-500" />
+                                    Persona Responsable
+                                </label>
+                                <select 
+                                    className="w-full border-slate-300 rounded-lg shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border text-sm"
+                                    value={editForm.responsable_id || ''}
+                                    onChange={e => setEditForm({...editForm, responsable_id: e.target.value || null})}
+                                >
+                                    <option value="">Sin asignar</option>
+                                    {usuarios.map(u => (
+                                        <option key={u.id} value={u.id}>{u.nombre_completo}</option>
+                                    ))}
+                                </select>
                             </div>
                         </div>
                         <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 flex-shrink-0">

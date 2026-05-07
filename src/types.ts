@@ -75,6 +75,7 @@ export interface ITRequest {
     tipoTarea?: string;
     complejidad?: string;
     ingresadoGestionDemanda?: string;
+    ultimoCambioEstado?: string;
 }
 
 export interface CatalogItem {

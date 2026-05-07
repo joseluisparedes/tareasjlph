@@ -137,9 +137,11 @@ export function useTareas() {
         }
     };
 
-    const crearTarea = async (titulo: string, descripcion: string | null, columna_id: string, urgencia: 'Verde'|'Amarillo'|'Rojo' = 'Verde') => {
+    const crearTarea = async (titulo: string, descripcion: string | null, columna_id: string, urgencia: 'Verde'|'Amarillo'|'Rojo' = 'Verde', responsable_id?: string | null) => {
         const tareasColumna = tareas.filter(t => t.columna_id === columna_id && t.estado === 'Activa');
         const orden = tareasColumna.length;
+
+        const finalResponsableId = responsable_id !== undefined ? responsable_id : (user?.id || null);
 
         const tempId = `temp-t-${Date.now()}`;
         const nuevaTarea: Tarea = {
@@ -152,7 +154,7 @@ export function useTareas() {
             origen: 'manual',
             orden,
             creado_por: user?.id || null,
-            responsable_id: user?.id || null, // Por defecto el creador
+            responsable_id: finalResponsableId,
             fecha_asignacion: new Date().toISOString(),
             fecha_creacion: new Date().toISOString(),
             fecha_actualizacion: new Date().toISOString(),
@@ -171,7 +173,7 @@ export function useTareas() {
                 origen: 'manual',
                 orden,
                 creado_por: user?.id,
-                responsable_id: user?.id,
+                responsable_id: finalResponsableId,
                 fecha_asignacion: new Date().toISOString()
             }])
             .select()

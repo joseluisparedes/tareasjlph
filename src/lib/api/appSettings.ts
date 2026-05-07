@@ -23,6 +23,39 @@ export const appSettingsApi = {
         }
     },
 
+    async obtenerUmbralesEstatus(): Promise<{ yellow: number, red: number }> {
+        try {
+            const { data, error } = await supabase
+                .from('app_settings')
+                .select('id, value')
+                .in('id', ['status_threshold_yellow', 'status_threshold_red']);
+
+            if (error) throw error;
+
+            const yellow = data?.find(d => d.id === 'status_threshold_yellow')?.value;
+            const red = data?.find(d => d.id === 'status_threshold_red')?.value;
+
+            return {
+                yellow: yellow ? parseInt(yellow) : 7,
+                red: red ? parseInt(red) : 14
+            };
+        } catch (e) {
+            console.error("Error al obtener umbrales de estatus:", e);
+            return { yellow: 7, red: 14 };
+        }
+    },
+
+    async actualizarUmbralesEstatus(yellow: number, red: number): Promise<void> {
+        const { error } = await supabase
+            .from('app_settings')
+            .upsert([
+                { id: 'status_threshold_yellow', value: yellow.toString(), updated_at: new Date().toISOString() },
+                { id: 'status_threshold_red', value: red.toString(), updated_at: new Date().toISOString() }
+            ]);
+
+        if (error) throw error;
+    },
+
     async actualizarPermisoRegistro(permitir: boolean): Promise<void> {
         const { error } = await supabase
             .from('app_settings')

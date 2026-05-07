@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ITRequest, Status, Urgency, CatalogoItem } from '../../types';
 import { MOCK_USERS } from '../../data/constants';
-import { AlertCircle, GripVertical, Copy } from 'lucide-react';
+import { AlertCircle, GripVertical, Copy, Clock } from 'lucide-react';
 import {
     DndContext,
     closestCorners,
@@ -36,6 +36,7 @@ interface KanbanBoardProps {
     catalogos: CatalogoItem[];
     onColumnOrderChange?: (newOrder: string[]) => void;
     onDuplicate?: (req: ITRequest) => void;
+    umbrales?: { yellow: number, red: number };
 }
 
 const getUrgencyStyle = (urgency: Urgency, catalogos?: CatalogoItem[]) => {
@@ -64,12 +65,33 @@ interface SortableItemProps {
     onDelete?: (id: string) => void;
     onDuplicate?: (req: ITRequest) => void;
     catalogosUrgencia?: CatalogoItem[];
+    umbrales?: { yellow: number, red: number };
 }
 
-const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ req, onEdit, onDelete, onDuplicate, catalogosUrgencia, isOverlay }) => {
+const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ req, onEdit, onDelete, onDuplicate, catalogosUrgencia, umbrales, isOverlay }) => {
     const { user, esAdministrador } = useAuth();
     const canEdit = esAdministrador || req.creadorId === user?.id;
     const assignee = MOCK_USERS.find(u => u.id === req.assigneeId);
+
+    // Cálculo de días en estado actual
+    const getDaysInStatus = () => {
+        if (!req.ultimoCambioEstado) return 0;
+        const start = new Date(req.ultimoCambioEstado).getTime();
+        const now = new Date().getTime();
+        const diff = now - start;
+        return Math.floor(diff / (1000 * 60 * 60 * 24));
+    };
+
+    const days = getDaysInStatus();
+    const thresholdYellow = umbrales?.yellow ?? 7;
+    const thresholdRed = umbrales?.red ?? 14;
+
+    const getStatusColor = () => {
+        if (req.status === 'Cerrado' || req.status === 'Closed') return 'text-slate-400 bg-slate-50 border-slate-100';
+        if (days >= thresholdRed) return 'text-red-700 bg-red-50 border-red-200';
+        if (days >= thresholdYellow) return 'text-amber-700 bg-amber-50 border-amber-200';
+        return 'text-emerald-700 bg-emerald-50 border-emerald-100';
+    };
 
     return (
         <div
@@ -122,22 +144,25 @@ const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ re
                 {req.description}
             </p>
 
-            <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-50 pt-2">
-                <div className="flex items-center gap-1.5" title="Domain">
-                    <span className="bg-slate-100 px-1.5 py-0.5 rounded text-slate-600 font-medium">
+            <div className="flex items-center justify-between gap-2 mt-auto pt-3 border-t border-slate-100">
+                <div className="flex items-center gap-2 overflow-hidden flex-1">
+                    <span className="text-[10px] text-slate-500 font-medium px-1.5 py-0.5 bg-slate-50 rounded-md border border-slate-100 truncate" title={req.domain}>
                         {req.domain}
                     </span>
+                    {req.status !== 'Cerrado' && req.status !== 'Closed' && (
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-black shrink-0 ${getStatusColor()}`} title={`Lleva ${days} días en este estado`}>
+                            <Clock size={10} strokeWidth={3} />
+                            {days}d
+                        </div>
+                    )}
                 </div>
 
-                <div className="flex items-center gap-2">
-                    {req.externalId && (
-                        <span className="text-[10px] bg-indigo-50 text-indigo-600 px-1 rounded" title={`Linked to ${req.externalId}`}>Linked</span>
-                    )}
+                <div className="flex items-center gap-2 shrink-0">
                     {assignee ? (
-                        <img src={assignee.avatarUrl} alt={assignee.name} className="w-5 h-5 rounded-full" title={assignee.name} />
+                        <img src={assignee.avatarUrl} alt={assignee.name} className="w-5 h-5 rounded-full ring-1 ring-slate-100 shadow-sm" title={assignee.name} />
                     ) : (
-                        <span className="text-[10px] text-slate-500 font-medium px-1.5 py-0.5 bg-slate-100 rounded border border-slate-200" title="Dirección Solicitante">
-                            {req.direccionSolicitante || '-'}
+                        <span className="text-[9px] text-slate-400 font-bold px-1.5 py-0.5 bg-white rounded-md border border-slate-100 uppercase tracking-tighter" title="Dirección Solicitante">
+                            {req.direccionSolicitante ? req.direccionSolicitante.split(' ')[0] : '-'}
                         </span>
                     )}
                 </div>
@@ -184,9 +209,10 @@ interface KanbanColumnProps {
     onDelete?: (id: string) => void;
     onDuplicate?: (req: ITRequest) => void;
     catalogosUrgencia?: CatalogoItem[];
+    umbrales?: { yellow: number, red: number };
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, onDelete, onDuplicate, catalogosUrgencia }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, onDelete, onDuplicate, catalogosUrgencia, umbrales }) => {
     const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
         id: status,
         data: { type: 'Column', status },
@@ -228,6 +254,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, o
                             onDelete={onDelete}
                             onDuplicate={onDuplicate}
                             catalogosUrgencia={catalogosUrgencia}
+                            umbrales={umbrales}
                         />
                     ))}
                 </SortableContext>
@@ -237,7 +264,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, o
 };
 
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onStatusChange, onDelete, onDuplicate, catalogosUrgencia, catalogos, onColumnOrderChange }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onStatusChange, onDelete, onDuplicate, catalogosUrgencia, catalogos, onColumnOrderChange, umbrales }) => {
     // Local state to handle visual reordering immediately
     const [localRequests, setLocalRequests] = useState<ITRequest[]>(requests);
     const [columns, setColumns] = useState<string[]>([]);
@@ -418,6 +445,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
                             onDelete={onDelete}
                             onDuplicate={onDuplicate}
                             catalogosUrgencia={catalogosUrgencia}
+                            umbrales={umbrales}
                         />
                     ))}
                 </SortableContext>
@@ -432,6 +460,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
                             onDelete={undefined}
                             onDuplicate={undefined}
                             catalogosUrgencia={catalogosUrgencia}
+                            umbrales={umbrales}
                             isOverlay
                         />
                     </div>

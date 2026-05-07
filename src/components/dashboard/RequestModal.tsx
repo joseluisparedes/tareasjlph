@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ITRequest, RequestType, Urgency, Status, CatalogItem, CatalogoItem, CatalogType } from '../../types';
-import type { SolicitudFecha, SolicitudApunte } from '../../lib/supabase/tipos-bd';
+import type { SolicitudFecha, SolicitudApunte, UsuarioFavorito } from '../../lib/supabase/tipos-bd';
 import { apuntesApi } from '../../lib/api/apuntes';
+import { favoritosApi } from '../../lib/api/favoritos';
 import { useAuth } from '../../hooks/useAuth';
-import { X, Save, Calendar, Hash, FileText, History, User, Grid, Star, Plus, Trash2, Copy } from 'lucide-react';
+import { X, Save, Calendar, Hash, FileText, History, User, Grid, Star, Plus, Trash2, Copy, Clock, Edit2 } from 'lucide-react';
+import { statusLogsApi } from '../../lib/api/statusLogs';
 
 interface RequestModalProps {
     isOpen: boolean;
@@ -14,6 +16,7 @@ interface RequestModalProps {
     domains: CatalogItem[];
     catalogos: CatalogoItem[];
     historialFechas?: SolicitudFecha[];
+    umbrales?: { yellow: number, red: number };
     getModo?: (tipo: CatalogType) => 'desplegable' | 'cuadros';
 }
 
@@ -24,7 +27,7 @@ const inputClass = "mt-1 block w-full rounded-md border-slate-300 shadow-sm focu
 const labelClass = "block text-xs font-semibold text-slate-600 uppercase tracking-wide";
 
 export const RequestModal: React.FC<RequestModalProps> = ({
-    isOpen, onClose, request, onSave, onDelete, domains, catalogos, historialFechas = [], getModo
+    isOpen, onClose, request, onSave, onDelete, domains, catalogos, historialFechas = [], umbrales, getModo
 }) => {
     const { perfil, user, esAdministrador } = useAuth();
     
@@ -60,6 +63,10 @@ export const RequestModal: React.FC<RequestModalProps> = ({
     const [guardandoApunte, setGuardandoApunte] = useState(false);
     const [editingApunteId, setEditingApunteId] = useState<string | null>(null);
     const [editNota, setEditNota] = useState('');
+    const [activeTab, setActiveTab] = useState<'info' | 'history'>('info');
+    const [statusLogs, setStatusLogs] = useState<any[]>([]);
+    const [editingLogId, setEditingLogId] = useState<string | null>(null);
+    const [editLogDate, setEditLogDate] = useState('');
 
     useEffect(() => {
         if (request) {
@@ -68,6 +75,9 @@ export const RequestModal: React.FC<RequestModalProps> = ({
             apuntesApi.obtenerPorSolicitud(request.id)
                 .then(setApuntes)
                 .catch(err => console.error("Error al cargar apuntes:", err));
+            statusLogsApi.obtenerPorSolicitud(request.id)
+                .then(setStatusLogs)
+                .catch(err => console.error("Error al cargar historial de estados:", err));
         } else {
             setFormData({
                 title: '', description: '',
@@ -80,6 +90,8 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                 ingresadoGestionDemanda: 'No'
             });
             setApuntes([]);
+            setStatusLogs([]);
+            setActiveTab('info');
         }
     }, [request, isOpen]);
 
@@ -97,59 +109,56 @@ export const RequestModal: React.FC<RequestModalProps> = ({
     }, [isOpen, request?.id]);
 
     // --- Lógica de Selecciones Favoritas ---
-    const [savedFavorites, setSavedFavorites] = useState<{ id: string, name: string, data: Partial<ITRequest> }[]>([]);
+    const [savedFavorites, setSavedFavorites] = useState<UsuarioFavorito[]>([]);
     const [isFavoriteMenuOpen, setIsFavoriteMenuOpen] = useState(false);
     const [newFavoriteName, setNewFavoriteName] = useState('');
     const [showSaveFavInput, setShowSaveFavInput] = useState(false);
+    const [isSavingFavorite, setIsSavingFavorite] = useState(false);
     const favoriteMenuRef = useRef<HTMLDivElement>(null);
     const [showDuplicateConfirm, setShowDuplicateConfirm] = useState(false);
     const [deleteApunteConfirmId, setDeleteApunteConfirmId] = useState<string | null>(null);
 
     useEffect(() => {
         if (user && isOpen) {
-            const favs = localStorage.getItem(`favorite_requests_${user.id}`);
-            if (favs) {
-                try {
-                    setSavedFavorites(JSON.parse(favs));
-                } catch (e) {
-                    console.error("Error parsing favorites", e);
-                }
-            }
+            favoritosApi.obtenerPorUsuario(user.id)
+                .then(setSavedFavorites)
+                .catch(err => console.error("Error al cargar favoritos de la BD:", err));
         }
     }, [user, isOpen]);
 
-    const saveFavoritesToStorage = (favs: { id: string, name: string, data: Partial<ITRequest> }[]) => {
-        if (user) {
-            localStorage.setItem(`favorite_requests_${user.id}`, JSON.stringify(favs));
-            setSavedFavorites(favs);
+    const handleSaveFavorite = async () => {
+        if (!newFavoriteName.trim() || !user) return;
+        setIsSavingFavorite(true);
+        try {
+            // Solo guardar campos que no sean ID, createdAt, apuntes, etc.
+            // También ignoramos Título, Descripción, Tarea SN, Ticket RIT, Fechas, Prioridad y Usuario Solicitante
+            const { 
+                id, createdAt, creadorId, creadorNombre, externalId, 
+                title, description, priority, tareaSN, ticketRIT, fechaInicio, fechaFin, requester,
+                ...dataToSave 
+            } = formData as any;
+            
+            const newFav = await favoritosApi.crear({
+                usuario_id: user.id,
+                nombre: newFavoriteName,
+                configuracion: dataToSave
+            });
+            
+            setSavedFavorites(prev => [newFav, ...prev]);
+            setNewFavoriteName('');
+            setShowSaveFavInput(false);
+        } catch (error) {
+            console.error("Error al guardar favorito:", error);
+            alert("No se pudo guardar la selección favorita.");
+        } finally {
+            setIsSavingFavorite(false);
         }
     };
 
-    const handleSaveFavorite = () => {
-        if (!newFavoriteName.trim()) return;
-        // Solo guardar campos que no sean ID, createdAt, apuntes, etc.
-        // También ignoramos Título, Descripción, Tarea SN, Ticket RIT, Fechas, Prioridad y Usuario Solicitante
-        const { 
-            id, createdAt, creadorId, creadorNombre, externalId, 
-            title, description, priority, tareaSN, ticketRIT, fechaInicio, fechaFin, requester,
-            ...dataToSave 
-        } = formData as any;
-        
-        const newFav = {
-            id: Date.now().toString(),
-            name: newFavoriteName,
-            data: dataToSave
-        };
-        const updatedFavs = [newFav, ...savedFavorites];
-        saveFavoritesToStorage(updatedFavs);
-        setNewFavoriteName('');
-        setShowSaveFavInput(false);
-    };
-
-    const handleLoadFavorite = (fav: { data: Partial<ITRequest> }) => {
+    const handleLoadFavorite = (fav: UsuarioFavorito) => {
         setFormData(prev => ({ 
             ...prev, 
-            ...fav.data, 
+            ...fav.configuracion, 
             // Restauramos los valores actuales que no deben ser sobreescritos por la plantilla
             id: prev.id, 
             createdAt: prev.createdAt,
@@ -165,10 +174,15 @@ export const RequestModal: React.FC<RequestModalProps> = ({
         setIsFavoriteMenuOpen(false);
     };
 
-    const handleDeleteFavorite = (id: string, e: React.MouseEvent) => {
+    const handleDeleteFavorite = async (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        const updatedFavs = savedFavorites.filter(f => f.id !== id);
-        saveFavoritesToStorage(updatedFavs);
+        try {
+            await favoritosApi.eliminar(id);
+            setSavedFavorites(prev => prev.filter(f => f.id !== id));
+        } catch (error) {
+            console.error("Error al eliminar favorito:", error);
+            alert("No se pudo eliminar el favorito.");
+        }
     };
 
     useEffect(() => {
@@ -295,12 +309,24 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                             <h3 className="text-lg font-bold text-slate-800">
                                 {request ? `Editar Solicitud: ${request.id}` : 'Nueva Solicitud TI'}
                             </h3>
-                            {request?.creadorNombre && (
-                                <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider flex items-center gap-1 mt-0.5">
-                                    <User size={10} /> Registrada por: {request.creadorNombre}
-                                </p>
-                            )}
-                            <p className="text-xs text-slate-500 mt-0.5">
+                            <div className="flex items-center gap-3 mt-1">
+                                {request?.creadorNombre && (
+                                    <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider flex items-center gap-1">
+                                        <User size={10} /> Registrada por: {request.creadorNombre}
+                                    </p>
+                                )}
+                                {request?.ultimoCambioEstado && request.status !== 'Cerrado' && request.status !== 'Closed' && (
+                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-100 text-[10px] font-black text-emerald-700">
+                                        <Clock size={12} strokeWidth={3} />
+                                        {(() => {
+                                            const start = new Date(request.ultimoCambioEstado).getTime();
+                                            const days = Math.floor((new Date().getTime() - start) / (1000 * 60 * 60 * 24));
+                                            return `${days} ${days === 1 ? 'DÍA' : 'DÍAS'} EN ESTE ESTADO`;
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
                                 {request ? 'Modifica los campos necesarios.' : 'Completa la información.'}
                             </p>
                         </div>
@@ -338,9 +364,12 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                                             value={newFavoriteName}
                                                             onChange={e => setNewFavoriteName(e.target.value)}
                                                             onKeyDown={e => e.key === 'Enter' && handleSaveFavorite()}
+                                                            disabled={isSavingFavorite}
                                                         />
-                                                        <button type="button" onClick={handleSaveFavorite} className="text-yellow-600 hover:text-yellow-800"><Save size={16} /></button>
-                                                        <button type="button" onClick={() => setShowSaveFavInput(false)} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
+                                                        <button type="button" onClick={handleSaveFavorite} disabled={isSavingFavorite} className="text-yellow-600 hover:text-yellow-800">
+                                                            {isSavingFavorite ? <span className="animate-spin">⌛</span> : <Save size={16} />}
+                                                        </button>
+                                                        <button type="button" onClick={() => setShowSaveFavInput(false)} disabled={isSavingFavorite} className="text-slate-400 hover:text-slate-600"><X size={16} /></button>
                                                     </div>
                                                 )}
                                             </div>
@@ -388,8 +417,28 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                         </div>
                     </div>
 
+                    {/* Tabs Selector */}
+                    <div className="px-4 sm:px-6 pt-2 border-b border-slate-200 bg-white flex gap-6 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('info')}
+                            className={`pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'info' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        >
+                            Información Detallada
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('history')}
+                            className={`pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'history' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                        >
+                            Historial de Estados
+                        </button>
+                    </div>
+
                     <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
                         <div className="px-4 sm:px-6 py-5 space-y-6">
+                            {activeTab === 'info' ? (
+                                <>
 
                             {/* 1. Información Principal y Apuntes */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -676,6 +725,107 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                     </div>
                                 )}
                             </div>
+                        </>
+                    ) : (
+                                <div className="space-y-6">
+                                    <div className="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-lg">
+                                        <p className="text-xs text-blue-700 leading-relaxed font-medium">
+                                            <strong>Nota Importante:</strong> El historial de estados se registra automáticamente al mover una tarjeta en el tablero. 
+                                            Puedes ajustar la fecha de un cambio si el registro real ocurrió en un momento distinto al de la actualización en la app.
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        {statusLogs.length === 0 ? (
+                                            <div className="py-12 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl text-center">
+                                                <History className="mx-auto text-slate-300 mb-2" size={32} />
+                                                <p className="text-sm text-slate-400 italic">No hay registros de cambios de estado todavía.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="relative border-l-2 border-slate-200 ml-4 pl-6 space-y-8">
+                                                {statusLogs.map((log) => (
+                                                    <div key={log.id} className="relative">
+                                                        <div className="absolute -left-[31px] top-1.5 w-4 h-4 rounded-full bg-blue-600 border-4 border-white shadow-sm"></div>
+                                                        <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:shadow-md transition-all">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <div>
+                                                                    <span className="text-[10px] font-black uppercase tracking-widest text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                                                                        {log.estado}
+                                                                    </span>
+                                                                    <div className="mt-2 flex items-center gap-2 text-xs font-bold text-slate-700">
+                                                                        <Calendar size={14} className="text-slate-400" />
+                                                                        {editingLogId === log.id ? (
+                                                                            <input 
+                                                                                type="datetime-local" 
+                                                                                className="border rounded px-2 py-1 text-[11px]"
+                                                                                value={editLogDate}
+                                                                                onChange={e => setEditLogDate(e.target.value)}
+                                                                            />
+                                                                        ) : (
+                                                                            new Date(log.fecha_registro).toLocaleString('es-PE', {
+                                                                                day: '2-digit', month: '2-digit', year: 'numeric',
+                                                                                hour: '2-digit', minute: '2-digit'
+                                                                            })
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                {canEdit && (
+                                                                    <div className="flex gap-2">
+                                                                        {editingLogId === log.id ? (
+                                                                            <>
+                                                                                <button 
+                                                                                    type="button"
+                                                                                    onClick={async () => {
+                                                                                        try {
+                                                                                            await statusLogsApi.actualizarFecha(log.id, new Date(editLogDate).toISOString());
+                                                                                            setStatusLogs(prev => prev.map(l => l.id === log.id ? { ...l, fecha_registro: editLogDate } : l));
+                                                                                            setEditingLogId(null);
+                                                                                        } catch (e) {
+                                                                                            alert("Error al actualizar fecha");
+                                                                                        }
+                                                                                    }}
+                                                                                    className="text-emerald-600 hover:text-emerald-700 p-1 bg-emerald-50 rounded"
+                                                                                >
+                                                                                    <Save size={14} />
+                                                                                </button>
+                                                                                <button 
+                                                                                    type="button"
+                                                                                    onClick={() => setEditingLogId(null)}
+                                                                                    className="text-slate-400 hover:text-slate-600 p-1"
+                                                                                >
+                                                                                    <X size={14} />
+                                                                                </button>
+                                                                            </>
+                                                                        ) : (
+                                                                            <button 
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setEditingLogId(log.id);
+                                                                                    const d = new Date(log.fecha_registro);
+                                                                                    const iso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                                                                                    setEditLogDate(iso);
+                                                                                }}
+                                                                                className="text-slate-400 hover:text-blue-600 p-1 hover:bg-blue-50 rounded transition-colors"
+                                                                                title="Editar fecha retroactivamente"
+                                                                            >
+                                                                                <Edit2 size={14} />
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-[10px] text-slate-400 font-medium">
+                                                                <User size={12} />
+                                                                Registrado por: {log.cambiado_por_nombre || 'Sistema'}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Footer */}

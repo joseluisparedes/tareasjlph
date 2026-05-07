@@ -23,9 +23,10 @@ interface DashboardProps {
     catalogos: CatalogoItem[];
     onUpdateCatalogoOrder?: (newOrder: string[]) => void;
     onUpdateRequest: (id: string, data: Partial<ITRequest>) => Promise<void>;
+    umbrales?: { yellow: number, red: number };
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onDuplicateRequest, onImportTickets, onStatusChange, onDelete, onDeleteBulk, catalogos, onUpdateCatalogoOrder, onUpdateRequest }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onDuplicateRequest, onImportTickets, onStatusChange, onDelete, onDeleteBulk, catalogos, onUpdateCatalogoOrder, onUpdateRequest, umbrales }) => {
     const { user } = useAuth();
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
     const [isFiltersVisibleMobile, setIsFiltersVisibleMobile] = useState(false);
@@ -526,6 +527,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         catalogosUrgencia={catalogos.filter(c => c.tipo === 'urgencia').sort((a, b) => (a.orden || 0) - (b.orden || 0))}
                         catalogos={catalogos}
                         onColumnOrderChange={onUpdateCatalogoOrder}
+                        umbrales={umbrales}
                     />
                 ) : viewMode === 'Timeline' ? (
                     <TimelineBoard

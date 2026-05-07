@@ -7,13 +7,15 @@ interface CriticalAlertsProps {
     requests: ITRequest[];
     onActivityClick?: (actividad: ActividadCalendario) => void;
     onIniciativaClick?: (iniciativa: ITRequest) => void;
+    umbrales?: { yellow: number, red: number };
 }
 
 export const CriticalAlerts: React.FC<CriticalAlertsProps> = ({ 
     actividades, 
     requests, 
     onActivityClick,
-    onIniciativaClick 
+    onIniciativaClick,
+    umbrales
 }) => {
     const iniciativasRef = useRef<HTMLDivElement>(null);
     const calendarioRef = useRef<HTMLDivElement>(null);
@@ -71,6 +73,23 @@ export const CriticalAlerts: React.FC<CriticalAlertsProps> = ({
         return end && (isSameDay(end, today) || isSameDay(end, tomorrow));
     });
 
+    const thresholdYellow = umbrales?.yellow ?? 7;
+    const thresholdRed = umbrales?.red ?? 14;
+
+    const estancadas = iniciativasActivas.filter(r => {
+        if (!r.ultimoCambioEstado) return false;
+        const start = new Date(r.ultimoCambioEstado).getTime();
+        const diff = new Date().getTime() - start;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        return days >= thresholdYellow;
+    });
+
+    const estancadasRojo = estancadas.filter(r => {
+        const start = new Date(r.ultimoCambioEstado!).getTime();
+        const days = Math.floor((new Date().getTime() - start) / (1000 * 60 * 60 * 24));
+        return days >= thresholdRed;
+    });
+
     const scrollTo = (ref: React.RefObject<HTMLDivElement>) => {
         ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
@@ -120,6 +139,14 @@ export const CriticalAlerts: React.FC<CriticalAlertsProps> = ({
                     label="Ver nuevas actividades"
                     onClick={() => scrollTo(calendarioRef)}
                 />
+                <MetricCard 
+                    title="Estancadas" 
+                    value={estancadas.length} 
+                    icon={<Timer size={24} />} 
+                    color="from-amber-500 to-orange-600"
+                    label="Hacer clic para ver detalle"
+                    onClick={() => scrollTo(iniciativasRef)}
+                />
             </div>
 
             {/* Panel de Resumen de Salud (Executive View) */}
@@ -137,6 +164,7 @@ export const CriticalAlerts: React.FC<CriticalAlertsProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                     <HealthBar label="Iniciativas Atrasadas" count={atrasadas.length} total={iniciativasActivas.length} color="bg-red-500" />
                     <HealthBar label="Iniciativas en Riesgo (48h)" count={vencenPronto.length} total={iniciativasActivas.length} color="bg-orange-500" />
+                    <HealthBar label="Iniciativas Estancadas" count={estancadas.length} total={iniciativasActivas.length} color="bg-amber-500" />
                 </div>
             </div>
 
@@ -188,6 +216,31 @@ export const CriticalAlerts: React.FC<CriticalAlertsProps> = ({
                             {vencenPronto.map(req => (
                                 <IniciativaCard key={req.id} req={req} onClick={() => onIniciativaClick?.(req)} critical={false} />
                             ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* Agrupación: Estancadas */}
+                {estancadas.length > 0 && (
+                    <div className="space-y-4 pt-4">
+                        <div className="flex items-center gap-2 px-1">
+                            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                            <h4 className="text-xs font-black text-amber-600 uppercase tracking-widest">Estancadas en el Estado Actual</h4>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {estancadas.map(req => {
+                                const start = new Date(req.ultimoCambioEstado!).getTime();
+                                const days = Math.floor((new Date().getTime() - start) / (1000 * 60 * 60 * 24));
+                                return (
+                                    <IniciativaCard 
+                                        key={req.id} 
+                                        req={req} 
+                                        onClick={() => onIniciativaClick?.(req)} 
+                                        critical={days >= thresholdRed} 
+                                        customLabel={`Lleva ${days} días en este estado`}
+                                    />
+                                );
+                            })}
                         </div>
                     </div>
                 )}
@@ -270,10 +323,10 @@ const ActivityCard = ({ act, onClick, status }: any) => (
     </div>
 );
 
-const IniciativaCard = ({ req, onClick, critical }: any) => (
+const IniciativaCard = ({ req, onClick, critical, customLabel }: any) => (
     <div 
         onClick={onClick}
-        className={`group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between min-h-[160px] ${critical ? 'border-l-4 border-l-red-500 hover:border-red-300' : 'hover:border-orange-300'}`}
+        className={`group bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-xl transition-all cursor-pointer flex flex-col justify-between min-h-[160px] ${critical ? 'border-l-4 border-l-red-500 hover:border-red-300' : 'hover:border-orange-300 border-l-4 border-l-orange-400'}`}
     >
         <div className="space-y-3">
             <div className="flex justify-between items-center">
@@ -287,7 +340,7 @@ const IniciativaCard = ({ req, onClick, critical }: any) => (
         <div className="pt-3 flex flex-col gap-2">
             <div className={`flex items-center gap-1.5 text-xs font-black ${critical ? 'text-red-500' : 'text-slate-500'}`}>
                 {critical ? <AlertCircle size={14} /> : <Timer size={14} />}
-                {critical ? 'ENTREGA HOY' : `Vence el ${req.fechaFin}`}
+                {customLabel ? customLabel : (critical ? 'ENTREGA HOY' : `Vence el ${req.fechaFin}`)}
             </div>
             <div className="flex justify-between items-center text-[10px] text-slate-400">
                 <span className="truncate max-w-[150px]">{req.requester}</span>
