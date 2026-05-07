@@ -762,7 +762,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                                                                 onChange={e => setEditLogDate(e.target.value)}
                                                                             />
                                                                         ) : (
-                                                                            new Date(log.fecha_registro).toLocaleString('es-PE', {
+                                                                            new Date(log.fecha_entrada).toLocaleString('es-PE', {
                                                                                 day: '2-digit', month: '2-digit', year: 'numeric',
                                                                                 hour: '2-digit', minute: '2-digit'
                                                                             })
@@ -778,7 +778,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                                                                     onClick={async () => {
                                                                                         try {
                                                                                             await statusLogsApi.actualizarFecha(log.id, new Date(editLogDate).toISOString());
-                                                                                            setStatusLogs(prev => prev.map(l => l.id === log.id ? { ...l, fecha_registro: editLogDate } : l));
+                                                                                            setStatusLogs(prev => prev.map(l => l.id === log.id ? { ...l, fecha_entrada: new Date(editLogDate).toISOString() } : l));
                                                                                             setEditingLogId(null);
                                                                                         } catch (e) {
                                                                                             alert("Error al actualizar fecha");
@@ -801,7 +801,7 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                                                                 type="button"
                                                                                 onClick={() => {
                                                                                     setEditingLogId(log.id);
-                                                                                    const d = new Date(log.fecha_registro);
+                                                                                    const d = new Date(log.fecha_entrada);
                                                                                     const iso = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
                                                                                     setEditLogDate(iso);
                                                                                 }}
