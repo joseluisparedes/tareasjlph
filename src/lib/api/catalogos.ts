@@ -2,30 +2,37 @@ import { supabase } from '../supabase/cliente';
 import type { CatalogoItem, CatalogType } from '../../types';
 
 export const catalogosApi = {
-    async obtenerPorTipo(tipo: CatalogType): Promise<CatalogoItem[]> {
-        const { data, error } = await supabase
+    async obtenerPorTipo(tipo: CatalogType, espacioId?: string): Promise<CatalogoItem[]> {
+        let query = supabase
             .from('catalogos')
             .select('*')
-            .eq('tipo', tipo)
-            .order('orden');
+            .eq('tipo', tipo);
+        
+        if (espacioId) query = query.eq('espacio_id', espacioId);
+        
+        const { data, error } = await query.order('orden');
         if (error) throw error;
         return (data ?? []) as CatalogoItem[];
     },
 
-    async obtenerTodos(): Promise<CatalogoItem[]> {
-        const { data, error } = await supabase
+    async obtenerTodos(espacioId?: string): Promise<CatalogoItem[]> {
+        let query = supabase
             .from('catalogos')
-            .select('*')
+            .select('*');
+        
+        if (espacioId) query = query.eq('espacio_id', espacioId);
+        
+        const { data, error } = await query
             .order('tipo')
             .order('orden');
         if (error) throw error;
         return (data ?? []) as CatalogoItem[];
     },
 
-    async crear(tipo: CatalogType, valor: string, orden = 0): Promise<CatalogoItem> {
+    async crear(tipo: CatalogType, valor: string, orden = 0, espacioId: string): Promise<CatalogoItem> {
         const { data, error } = await supabase
             .from('catalogos')
-            .insert({ tipo, valor, orden, esta_activo: true })
+            .insert({ tipo, valor, orden, esta_activo: true, espacio_id: espacioId })
             .select()
             .single();
         if (error) throw error;

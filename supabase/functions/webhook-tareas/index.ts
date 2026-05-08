@@ -52,14 +52,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '' // Usamos Service Role para saltar políticas RLS si es necesario
     )
 
-    // Obtenemos el propietario de la columna para asignarle la tarea
+    // Obtenemos el propietario de la columna y el espacio_id para asignarle la tarea
     const { data: columnaData } = await supabaseClient
       .from('tareas_columnas')
-      .select('creado_por')
+      .select('creado_por, espacio_id')
       .eq('id', columna_id)
       .single()
 
     const propietario = columnaData ? columnaData.creado_por : null;
+    const espacioId = columnaData ? columnaData.espacio_id : null;
 
     // Calculamos el orden para que aparezca al inicio de la columna (top)
     const { data: tareasExistentes } = await supabaseClient
@@ -69,9 +70,9 @@ serve(async (req) => {
       .order('orden', { ascending: true }) // Buscamos el mínimo
       .limit(1)
 
-    const nuevoOrden = tareasExistentes && tareasExistentes.length > 0 ? tareasExistentes[0].orden - 1 : 0;
+    const nuevoOrden = (tareasExistentes && tareasExistentes.length > 0) ? (tareasExistentes[0].orden - 1) : 0;
 
-    // Insertamos la tarea
+    // Insertamos la tarea con el espacio_id heredado de la columna
     const nuevaTarea = {
       titulo,
       descripcion: descripcion || null,
@@ -80,7 +81,8 @@ serve(async (req) => {
       urgencia: 'Verde',
       origen: 'integracion',
       orden: nuevoOrden,
-      creado_por: propietario
+      creado_por: propietario,
+      espacio_id: espacioId
     }
 
     const { data, error } = await supabaseClient

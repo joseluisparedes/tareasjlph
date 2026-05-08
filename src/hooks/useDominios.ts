@@ -1,18 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { dominiosApi } from '../lib/api/dominios';
 import type { Dominio } from '../lib/supabase/tipos-bd';
 import { useAuth } from './useAuth';
+import { useWorkspaces } from './useWorkspaces';
 
 export function useDominios() {
     const { user } = useAuth();
+    const { currentWorkspace } = useWorkspaces();
     const [dominios, setDominios] = useState<Dominio[]>([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     const userId = user?.id;
+    const workspaceId = currentWorkspace?.id;
 
     const cargar = useCallback(async (silencioso = false) => {
-        if (!userId) {
+        if (!userId || !workspaceId) {
             setDominios([]);
             setCargando(false);
             return;
@@ -20,21 +23,33 @@ export function useDominios() {
         try {
             if (!silencioso) setCargando(true);
             setError(null);
-            const datos = await dominiosApi.obtenerTodos();
+            const datos = await dominiosApi.obtenerTodos(workspaceId);
             setDominios(datos);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al cargar dominios');
         } finally {
             if (!silencioso) setCargando(false);
         }
-    }, [userId]);
+    }, [userId, workspaceId]);
+
+    const lastWorkspaceId = useRef<string | null>(null);
 
     useEffect(() => {
-        cargar();
-    }, [cargar]);
+        if (workspaceId) {
+            if (lastWorkspaceId.current !== workspaceId) {
+                lastWorkspaceId.current = workspaceId;
+                cargar();
+            }
+        } else {
+            lastWorkspaceId.current = null;
+            setDominios([]);
+            setCargando(false);
+        }
+    }, [cargar, workspaceId]);
 
     const crearDominio = async (nombre: string) => {
-        const nuevo = await dominiosApi.crear(nombre);
+        if (!workspaceId) throw new Error("No hay espacio de trabajo seleccionado");
+        const nuevo = await dominiosApi.crear(nombre, workspaceId);
         setDominios(prev => [...prev, nuevo].sort((a, b) => a.nombre.localeCompare(b.nombre)));
         return nuevo;
     };

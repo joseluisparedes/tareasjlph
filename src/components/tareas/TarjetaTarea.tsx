@@ -16,6 +16,7 @@ interface TarjetaTareaProps {
     usuarios: any[];
     isOverlay?: boolean;
     isMaster?: boolean;
+    canEdit?: boolean;
 }
 
 const urgenciaColors = {
@@ -33,7 +34,8 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({
     onViewLogs,
     usuarios = [],
     isOverlay,
-    isMaster = false 
+    isMaster = false,
+    canEdit = true
 }) => {
     const { user } = useAuth();
     const {
@@ -46,10 +48,11 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({
     } = useSortable({ 
         id: tarea.id, 
         data: { type: 'Tarea', columna_id: tarea.columna_id },
-        disabled: !(tarea.responsable_id === user?.id || isMaster)
+        disabled: !canEdit
     });
 
-    const isResponsible = tarea.responsable_id === user?.id || isMaster;
+    const canUserEdit = canEdit || isMaster;
+    const isResponsible = canUserEdit;
     const responsable = usuarios.find(u => u.id === tarea.responsable_id);
 
     const [isFinalizeModalOpen, setFinalizeModalOpen] = useState(false);
@@ -66,7 +69,7 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({
         <div 
             className={`bg-white p-3 rounded-lg border shadow-sm transition-all group select-none relative
                 ${colors.border}
-                ${isOverlay ? 'shadow-xl rotate-2 scale-105 cursor-grabbing' : 'hover:shadow-md cursor-grab active:cursor-grabbing'}
+                ${isOverlay ? 'shadow-xl rotate-2 scale-105 cursor-grabbing' : (canUserEdit ? 'hover:shadow-md cursor-grab active:cursor-grabbing' : 'hover:shadow-md cursor-pointer')}
             `}
             onDoubleClick={() => onEdit && onEdit(tarea)}
         >
@@ -163,7 +166,7 @@ export const TarjetaTarea: React.FC<TarjetaTareaProps> = ({
                     <span className="text-[10px] font-medium text-slate-500 truncate">
                         {responsable?.nombre_completo || 'Sin asignar'}
                     </span>
-                    {!isResponsible && (
+                    {!canEdit && (
                         <span className="ml-auto text-[9px] font-bold text-slate-300 uppercase tracking-tighter">Lectura</span>
                     )}
                 </div>

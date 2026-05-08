@@ -4,12 +4,13 @@ import { useTareas } from '../../hooks/useTareas';
 import { useUsuarios } from '../../hooks/useUsuarios';
 import { Columna } from './Columna';
 import { TarjetaTarea } from './TarjetaTarea';
-import { Plus, Loader2, Mail, Trash2, FileText, Eye, Sparkles, Download, User, History, Filter } from 'lucide-react';
+import { Plus, Loader2, Mail, Trash2, FileText, Eye, Sparkles, Download, User, History, Filter, AlertCircle, ChevronDown } from 'lucide-react';
 import { RequestModal } from '../dashboard/RequestModal';
 import { useCatalogos } from '../../hooks/useCatalogos';
 import { useDominios } from '../../hooks/useDominios';
 import { useSolicitudes } from '../../hooks/useSolicitudes';
 import { useCatalogoConfig } from '../../hooks/useCatalogoConfig';
+import { useWorkspaces } from '../../hooks/useWorkspaces';
 import { ITRequest, Status } from '../../types';
 import {
     DndContext,
@@ -58,6 +59,7 @@ export const TareasBoard: React.FC = () => {
     const { crearSolicitud, solicitudes } = useSolicitudes();
     const { getModo } = useCatalogoConfig();
     const { user } = useAuth();
+    const { canEditTareas } = useWorkspaces();
     
     const isMaster = user?.email === 'jose241100@gmail.com';
 
@@ -186,7 +188,7 @@ export const TareasBoard: React.FC = () => {
     // ...
     const [searchTerm, setSearchTerm] = useState('');
     const [urgencyFilter, setUrgencyFilter] = useState<string>('Todas');
-    const [onlyMyTasks, setOnlyMyTasks] = useState(false);
+    const [userFilter, setUserFilter] = useState<string>('all'); // 'all', 'me', or userId
 
     React.useEffect(() => {
         // Enforce filters on local mapping without destroying real positions
@@ -194,11 +196,18 @@ export const TareasBoard: React.FC = () => {
             const matchesSearch = t.titulo.toLowerCase().includes(searchTerm.toLowerCase()) || 
                                   (t.descripcion?.toLowerCase() || '').includes(searchTerm.toLowerCase());
             const matchesUrgency = urgencyFilter === 'Todas' || t.urgencia === urgencyFilter;
-            const matchesUser = !onlyMyTasks || t.responsable_id === user?.id;
+            
+            let matchesUser = true;
+            if (userFilter === 'me') {
+                matchesUser = t.responsable_id === user?.id;
+            } else if (userFilter !== 'all') {
+                matchesUser = t.responsable_id === userFilter;
+            }
+            
             return matchesSearch && matchesUrgency && matchesUser;
         });
         setLocalTareas(filtered);
-    }, [tareas, searchTerm, urgencyFilter, onlyMyTasks, user?.id]);
+    }, [tareas, searchTerm, urgencyFilter, userFilter, user?.id]);
 
     useEffect(() => {
         setLocalColumnas(columnas);
@@ -322,13 +331,9 @@ export const TareasBoard: React.FC = () => {
     // Drag and Drop Handlers
     const handleDragStart = (event: DragStartEvent) => {
         const { active } = event;
-        const item = active.data.current?.type === 'Tarea' ? localTareas.find(t => t.id === active.id) : null;
         
-        const isOwner = active.data.current?.type === 'Columna' 
-            ? (columnas.find(c => c.id === active.id)?.creado_por === user?.id || isMaster)
-            : (item?.responsable_id === user?.id || isMaster);
-
-        if (!isOwner) return; // Prevent drag if not owner or master
+        // Allow dragging if user has edit permission for tasks in this workspace
+        if (!canEditTareas()) return;
 
         setActiveId(active.id as string);
         setActiveType(active.data.current?.type || 'Tarea');
@@ -513,17 +518,27 @@ export const TareasBoard: React.FC = () => {
                 </div>
                 
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setOnlyMyTasks(!onlyMyTasks)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                            onlyMyTasks 
-                                ? 'bg-blue-100 text-blue-700 border border-blue-200' 
-                                : 'bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100'
-                        }`}
-                    >
-                        <User size={16} />
-                        {onlyMyTasks ? 'Mis Tareas' : 'Todas las Tareas'}
-                    </button>
+                    <span className="text-sm font-medium text-slate-500">Filtrar por:</span>
+                    <div className="relative group/userfilter">
+                        <select
+                            value={userFilter}
+                            onChange={e => setUserFilter(e.target.value)}
+                            className="appearance-none pl-10 pr-10 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all cursor-pointer min-w-[180px] text-slate-700"
+                        >
+                            <option value="all">Todas las Tareas</option>
+                            <option value="me">Mis Tareas</option>
+                            {usuarios.filter(u => u.id !== user?.id).map(u => (
+                                <option key={u.id} value={u.id}>{u.nombre_completo}</option>
+                            ))}
+                        </select>
+                        <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                            <User size={18} />
+                        </div>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                            <ChevronDown size={16} />
+                        </div>
+                    </div>
+                </div>
 
                     <button
                         onClick={() => {
@@ -552,7 +567,13 @@ export const TareasBoard: React.FC = () => {
                         IA
                     </button>
                 </div>
-            </div>
+
+            {!canEditTareas() && (
+                <div className="bg-amber-50 border border-amber-200 p-2 px-4 rounded-lg flex items-center gap-2 text-amber-800 text-xs font-medium">
+                    <AlertCircle size={14} />
+                    Tienes permisos de solo lectura para las tareas de este grupo.
+                </div>
+            )}
 
             <DndContext
                 sensors={sensors}
@@ -578,16 +599,19 @@ export const TareasBoard: React.FC = () => {
                                 onViewLogs={verLogs}
                                 usuarios={usuarios}
                                 isMaster={isMaster}
+                                canEdit={canEditTareas()}
                             />
                         ))}
                     </SortableContext>
                     
-                    <button 
-                        onClick={handleAddColumna}
-                        className="min-w-[320px] h-[60px] flex items-center justify-center gap-2 rounded-xl bg-slate-100/50 border-2 border-dashed border-slate-300 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 hover:border-blue-300 transition-all flex-shrink-0"
-                    >
-                        <Plus size={20} /> Añadir Vertical
-                    </button>
+                    {canEditTareas() && (
+                        <button 
+                            onClick={handleAddColumna}
+                            className="min-w-[320px] h-[60px] flex items-center justify-center gap-2 rounded-xl bg-slate-100/50 border-2 border-dashed border-slate-300 text-slate-500 hover:text-blue-600 hover:bg-blue-50/50 hover:border-blue-300 transition-all flex-shrink-0"
+                        >
+                            <Plus size={20} /> Añadir Vertical
+                        </button>
+                    )}
                 </div>
 
                 <DragOverlay dropAnimation={{ sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: '0.5' } } }) }}>
@@ -597,7 +621,7 @@ export const TareasBoard: React.FC = () => {
 
             {/* Modal de edición */}
             {isEditModalOpen && (() => {
-                const canEdit = editingTarea ? (editingTarea.responsable_id === user?.id || isMaster) : true;
+                const canEdit = canEditTareas();
                 return (
                     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                         <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden flex flex-col max-h-[90vh]">

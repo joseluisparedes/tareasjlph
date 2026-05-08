@@ -19,10 +19,11 @@ import { useCatalogoConfig } from './hooks/useCatalogoConfig';
 import { useAuth } from './hooks/useAuth';
 import { useCalendario } from './hooks/useCalendario';
 import { useAppSettings } from './hooks/useAppSettings';
+import { useWorkspaces } from './hooks/useWorkspaces';
 import type { Solicitud, Dominio, SolicitudFecha } from './lib/supabase/tipos-bd';
 import type { CatalogType } from './types';
 import { fechasApi } from './lib/api/fechas';
-import { LogOut, Loader2, Menu } from 'lucide-react';
+import { LogOut, Loader2, Menu, ChevronDown, AlertCircle } from 'lucide-react';
 
 // Adaptadores: convierte tipos de Supabase a tipos del frontend
 function adaptarSolicitud(s: any, dominios: Dominio[]): ITRequest {
@@ -55,6 +56,7 @@ function adaptarSolicitud(s: any, dominios: Dominio[]): ITRequest {
         complejidad: s.complejidad ?? undefined,
         ingresadoGestionDemanda: s.ingresado_gestion_demanda ?? undefined,
         ultimoCambioEstado: s.ultimo_cambio_estado ?? undefined,
+        orden: s.orden ?? undefined,
     };
 }
 
@@ -85,6 +87,7 @@ export default function App() {
         cambiarEstado,
         crearSolicitud,
         actualizarSolicitud,
+        reordenarSolicitudes,
         eliminarSolicitud,
     } = useSolicitudes();
 
@@ -104,8 +107,9 @@ export default function App() {
 
     const { actividades } = useCalendario();
 
+    const { workspaces, currentWorkspace, setCurrentWorkspace, cargando: cargandoWorkspaces, canEditIniciativas } = useWorkspaces();
     const { getModo, setModo } = useCatalogoConfig();
-    const { umbrales, actualizarUmbrales } = useAppSettings();
+    const { umbrales, actualizarUmbrales } = useAppSettings(currentWorkspace?.id);
 
     const handleDeleteRequest = (id: string) => {
         setDeleteConfirmId(id);
@@ -132,12 +136,12 @@ export default function App() {
     };
 
     // Pantalla de carga inicial
-    if (cargandoAuth) {
+    if (cargandoAuth || cargandoWorkspaces) {
         return (
             <div className="min-h-screen bg-slate-900 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
                     <Loader2 className="text-blue-500 animate-spin" size={40} />
-                    <p className="text-slate-400 text-sm">Cargando...</p>
+                    <p className="text-slate-400 text-sm">Cargando grupos y sesión...</p>
                 </div>
             </div>
         );
@@ -146,6 +150,36 @@ export default function App() {
     // Si no hay sesión, mostrar pantalla de autenticación
     if (!user) {
         return <AuthPage />;
+    }
+
+    if (workspaces.length === 0) {
+        return (
+            <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+                <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-2xl text-center">
+                    <div className="w-16 h-16 bg-blue-500/10 text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <AlertCircle size={32} />
+                    </div>
+                    <h2 className="text-2xl font-bold text-white mb-2">Sin Grupo de Trabajo</h2>
+                    <p className="text-slate-400 mb-8">
+                        Actualmente no perteneces a ningún grupo de trabajo. 
+                        Por favor, comunícate con el administrador para que te incluya en uno y puedas comenzar a trabajar.
+                    </p>
+                    <div className="flex flex-col gap-3">
+                        <div className="p-3 bg-slate-900/50 rounded-xl border border-slate-700/50">
+                            <p className="text-xs text-slate-500 uppercase font-bold tracking-wider mb-1">Tu Usuario</p>
+                            <p className="text-sm text-slate-300 font-mono">{user.email}</p>
+                        </div>
+                        <button 
+                            onClick={cerrarSesion}
+                            className="w-full mt-4 py-3 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-xl transition-all flex items-center justify-center gap-2"
+                        >
+                            <LogOut size={18} />
+                            Cerrar Sesión
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     // Datos adaptados para los componentes existentes
@@ -239,6 +273,7 @@ export default function App() {
             tipo_tarea: req.tipoTarea || null,
             complejidad: req.complejidad || null,
             ingresado_gestion_demanda: req.ingresadoGestionDemanda || null,
+            orden: req.orden || 0,
         };
 
         if (solicitudes.some(s => s.id === req.id)) {
@@ -487,24 +522,52 @@ export default function App() {
                                 {vistaSegura === 'Integrations' && 'Importación y Exportación'}
                                 {vistaSegura === 'Alertas' && 'Centro de Alertas Críticas'}
                             </h2>
-                            <p className="text-sm text-slate-500 hidden sm:block">
-                            {vistaSegura === 'Dashboard' && (
-                                cargando
-                                    ? 'Cargando solicitudes...'
-                                    : `Gestiona tu portafolio TI. ${requests.length} solicitudes activas.`
-                            )}
-                            {vistaSegura === 'Tareas' && 'Agiliza tus actividades con tarjetas interactivas.'}
-                            {vistaSegura === 'Calendario' && 'Visualiza y gestiona eventos y actividades clave del equipo.'}
-                            {vistaSegura === 'Admin' && 'Configurar catálogos y usuarios.'}
-                            {vistaSegura === 'Reports' && 'Visualizar carga de trabajo y rendimiento.'}
-                            {vistaSegura === 'Integrations' && 'Carga masiva y descarga de reportes.'}
-                            {vistaSegura === 'Alertas' && 'Resumen de procesos que inician o vencen próximamente.'}
-                        </p>
+                            <div className="mt-1 flex items-center gap-2">
+                                <p className="text-sm text-slate-500 hidden sm:block">
+                                    {vistaSegura === 'Dashboard' && (
+                                        cargando
+                                            ? 'Cargando solicitudes...'
+                                            : `Gestiona tu portafolio TI. ${requests.length} solicitudes activas.`
+                                    )}
+                                    {vistaSegura === 'Tareas' && 'Agiliza tus actividades con tarjetas interactivas.'}
+                                    {vistaSegura === 'Calendario' && 'Visualiza y gestiona eventos y actividades clave del equipo.'}
+                                    {vistaSegura === 'Admin' && 'Configurar catálogos y usuarios.'}
+                                    {vistaSegura === 'Reports' && 'Visualizar carga de trabajo y rendimiento.'}
+                                    {vistaSegura === 'Integrations' && 'Carga masiva y descarga de reportes.'}
+                                    {vistaSegura === 'Alertas' && 'Resumen de procesos que inician o vencen próximamente.'}
+                                </p>
+                                {workspaces.length > 0 && (
+                                    <div className="flex items-center gap-1 bg-slate-200/50 px-2 py-0.5 rounded text-xs font-medium text-slate-600">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                        {currentWorkspace?.nombre}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
                     {/* User info + logout */}
                     <div className="flex items-center justify-between w-full md:w-auto gap-4">
+                        {/* Selector de Espacio (Dropdown) */}
+                        {workspaces.length >= 1 && (
+                            <div className="relative group">
+                                <select 
+                                    value={currentWorkspace?.id} 
+                                    onChange={(e) => {
+                                        const ws = workspaces.find(w => w.id === e.target.value);
+                                        if (ws) setCurrentWorkspace(ws);
+                                    }}
+                                    className="appearance-none text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 pr-8 py-2 outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all cursor-pointer font-medium text-slate-700 hover:bg-white"
+                                >
+                                    {workspaces.map(w => (
+                                        <option key={w.id} value={w.id}>{w.nombre}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                    <ChevronDown size={14} />
+                                </div>
+                            </div>
+                        )}
                         <NotificationBell
                             requests={requests}
                             actividades={actividades}
@@ -569,6 +632,7 @@ export default function App() {
                                     });
                                     await Promise.all(updates);
                                 }}
+                                onUpdateSolicitudesOrder={reordenarSolicitudes}
                                 onDelete={handleDeleteRequest}
                                 onDeleteBulk={async (ids) => {
                                     for (const id of ids) {
@@ -577,6 +641,7 @@ export default function App() {
                                 }}
                                 onUpdateRequest={handleUpdateRequest}
                                 umbrales={umbrales}
+                                canEdit={canEditIniciativas()}
                             />
                         )}
                         {vistaSegura === 'Tareas' && (
@@ -591,6 +656,15 @@ export default function App() {
                                 users={[]}
                                 onUpdateDomain={handleUpdateDomain}
                                 onAddDomain={handleAddDomain}
+                                onDeleteDomain={async (id) => {
+                                    if(confirm('¿Eliminar este dominio? Se perderá la vinculación con las iniciativas.')) {
+                                        try {
+                                            await eliminarDominio(id);
+                                        } catch (e) {
+                                            handleRLSError(e, 'eliminar el dominio');
+                                        }
+                                    }
+                                }}
                                 catalogos={catalogos}
                                 onAddCatalogo={async (tipo: CatalogType, valor: string) => {
                                     try {
@@ -677,6 +751,7 @@ export default function App() {
                 catalogos={catalogos}
                 historialFechas={historialFechas}
                 getModo={getModo}
+                canEditExternal={canEditIniciativas()}
             />
         </div>
     );

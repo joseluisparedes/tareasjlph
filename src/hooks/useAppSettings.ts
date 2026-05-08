@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { appSettingsApi } from '../lib/api/appSettings';
 
-export function useAppSettings() {
+export function useAppSettings(espacioId?: string | null) {
     const [permitirRegistro, setPermitirRegistro] = useState<boolean | null>(null);
     const [umbrales, setUmbrales] = useState<{ yellow: number, red: number }>({ yellow: 7, red: 14 });
     const [cargando, setCargando] = useState(true);
@@ -11,20 +11,25 @@ export function useAppSettings() {
         try {
             setCargando(true);
             setError(null);
-            const [permiso, thresholds] = await Promise.all([
+            
+            // Si hay espacioId, obtenemos sus umbrales. Si no, usamos los por defecto o globales.
+            const fetchPromises: [Promise<boolean>, Promise<{yellow: number, red: number}>] = [
                 appSettingsApi.obtenerPermisoRegistro(),
-                appSettingsApi.obtenerUmbralesEstatus()
-            ]);
+                espacioId 
+                    ? appSettingsApi.obtenerUmbralesEstatus(espacioId) 
+                    : Promise.resolve({ yellow: 7, red: 14 })
+            ];
+
+            const [permiso, thresholds] = await Promise.all(fetchPromises);
             setPermitirRegistro(permiso);
             setUmbrales(thresholds);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Error al cargar configuración de la app');
-            // Por defecto, asume verdadero si hay error
             setPermitirRegistro(true);
         } finally {
             setCargando(false);
         }
-    }, []);
+    }, [espacioId]);
 
     useEffect(() => {
         cargar();
@@ -36,7 +41,8 @@ export function useAppSettings() {
     };
 
     const actualizarUmbrales = async (yellow: number, red: number) => {
-        await appSettingsApi.actualizarUmbralesEstatus(yellow, red);
+        if (!espacioId) return;
+        await appSettingsApi.actualizarUmbralesEstatus(espacioId, yellow, red);
         setUmbrales({ yellow, red });
     };
 

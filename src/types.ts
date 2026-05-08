@@ -24,6 +24,7 @@ export enum Status {
 export type UserRole = 'Administrador' | 'Colaborador';
 
 export type CatalogType =
+    | 'dominios'
     | 'tipo_requerimiento'
     | 'prioridad'
     | 'urgencia'
@@ -35,7 +36,6 @@ export type CatalogType =
     | 'institucion'
     | 'tipo_tarea'
     | 'complejidad'
-    | 'dominios'
     | 'ingresado_gestion_demanda'
     | 'tipo_actividad_calendario';
 
@@ -76,12 +76,14 @@ export interface ITRequest {
     complejidad?: string;
     ingresadoGestionDemanda?: string;
     ultimoCambioEstado?: string;
+    orden?: number;
 }
 
 export interface CatalogItem {
     id: string;
     name: string;
     isActive: boolean;
+    orden?: number;
 }
 
 export interface CatalogoItem {
@@ -92,11 +94,13 @@ export interface CatalogoItem {
     orden: number;
     color?: string | null;
     abreviatura?: string | null;
+    espacio_id?: string;
 }
 
 export interface CatalogoConfig {
     tipo: CatalogType;
     modo_visualizacion: 'desplegable' | 'cuadros';
+    espacio_id?: string;
 }
 
 export type ViewMode = 'Dashboard' | 'Admin' | 'Reports' | 'Integrations' | 'Tareas' | 'Calendario' | 'Alertas';
@@ -112,7 +116,8 @@ export interface FilterState {
     ingresadoGestionDemanda: string[]; // Nueva propiedad
     brm: string[]; // Nueva propiedad
     search: string;
-    onlyMine: boolean; // Nueva propiedad
+    onlyMine: boolean;
+    assigneeIds: string[];
 }
 
 export interface SavedFilter {
@@ -143,4 +148,20 @@ export interface ActividadLog {
     campo_modificado: string;
     valor_anterior: string;
     valor_nuevo: string;
+}
+
+export type Permission = 'lectura' | 'edicion';
+
+export interface Workspace {
+    id: string;
+    nombre: string;
+    descripcion?: string;
+}
+
+export interface WorkspaceMember {
+    id: string;
+    workspace_id: string;
+    user_id: string;
+    rol_iniciativas: Permission;
+    rol_tareas: Permission;
 }

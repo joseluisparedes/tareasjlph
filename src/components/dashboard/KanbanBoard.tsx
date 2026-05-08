@@ -34,9 +34,11 @@ interface KanbanBoardProps {
     onDelete?: (id: string) => void;
     catalogosUrgencia?: CatalogoItem[];
     catalogos: CatalogoItem[];
+    onUpdateSolicitudesOrder?: (updates: { id: string, orden: number }[]) => void;
     onColumnOrderChange?: (newOrder: string[]) => void;
     onDuplicate?: (req: ITRequest) => void;
     umbrales?: { yellow: number, red: number };
+    canEdit?: boolean;
 }
 
 const getUrgencyStyle = (urgency: Urgency, catalogos?: CatalogoItem[]) => {
@@ -66,11 +68,12 @@ interface SortableItemProps {
     onDuplicate?: (req: ITRequest) => void;
     catalogosUrgencia?: CatalogoItem[];
     umbrales?: { yellow: number, red: number };
+    canEditExternal?: boolean;
 }
 
-const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ req, onEdit, onDelete, onDuplicate, catalogosUrgencia, umbrales, isOverlay }) => {
+const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ req, onEdit, onDelete, onDuplicate, catalogosUrgencia, umbrales, isOverlay, canEditExternal }) => {
     const { user, esAdministrador } = useAuth();
-    const canEdit = esAdministrador || req.creadorId === user?.id;
+    const canEdit = esAdministrador || req.creadorId === user?.id || canEditExternal;
     const assignee = MOCK_USERS.find(u => u.id === req.assigneeId);
 
     // Cálculo de días en estado actual
@@ -97,8 +100,8 @@ const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ re
         <div
             onClick={() => onEdit(req)}
             className={`bg-white p-3 rounded-lg border border-slate-200 shadow-sm transition-all group select-none
-        ${isOverlay ? 'shadow-xl rotate-2 scale-105 cursor-grabbing' : (canEdit ? 'hover:shadow-md cursor-grab active:cursor-grabbing' : 'hover:shadow-md cursor-pointer')}
-      `}
+                ${isOverlay ? 'shadow-xl rotate-2 scale-105 cursor-grabbing' : (canEdit ? 'hover:shadow-md cursor-grab active:cursor-grabbing' : 'hover:shadow-md cursor-pointer')}
+            `}
         >
             <div className="flex justify-between items-start mb-2">
                 <span className="text-[10px] font-mono text-slate-400">{req.id}</span>
@@ -173,7 +176,7 @@ const RequestCard: React.FC<SortableItemProps & { isOverlay?: boolean }> = ({ re
 
 const SortableRequestItem: React.FC<SortableItemProps> = (props) => {
     const { user, esAdministrador } = useAuth();
-    const canEdit = esAdministrador || props.req.creadorId === user?.id;
+    const canEdit = esAdministrador || props.req.creadorId === user?.id || props.canEditExternal;
 
     const {
         attributes,
@@ -210,9 +213,10 @@ interface KanbanColumnProps {
     onDuplicate?: (req: ITRequest) => void;
     catalogosUrgencia?: CatalogoItem[];
     umbrales?: { yellow: number, red: number };
+    canEdit?: boolean;
 }
 
-const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, onDelete, onDuplicate, catalogosUrgencia, umbrales }) => {
+const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, onDelete, onDuplicate, catalogosUrgencia, umbrales, canEdit }) => {
     const { setNodeRef, attributes, listeners, transform, transition, isDragging } = useSortable({
         id: status,
         data: { type: 'Column', status },
@@ -233,7 +237,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, o
             <div
                 {...attributes}
                 {...listeners}
-                className="p-3 border-b border-slate-200 bg-slate-50 rounded-t-xl flex justify-between items-center sticky top-0 z-10 cursor-grab active:cursor-grabbing"
+                className={`p-3 border-b border-slate-200 rounded-t-xl flex justify-between items-center bg-slate-50 ${canEdit ? 'cursor-grab active:cursor-grabbing' : 'cursor-default'}`}
             >
                 <h3 className="font-semibold text-slate-700 text-sm uppercase tracking-wide flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${status === 'Cerrado' || status === 'Closed' ? 'bg-green-500' : 'bg-blue-500'}`}></span>
@@ -255,6 +259,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, o
                             onDuplicate={onDuplicate}
                             catalogosUrgencia={catalogosUrgencia}
                             umbrales={umbrales}
+                            canEditExternal={canEdit}
                         />
                     ))}
                 </SortableContext>
@@ -264,9 +269,15 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ status, requests, onEdit, o
 };
 
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onStatusChange, onDelete, onDuplicate, catalogosUrgencia, catalogos, onColumnOrderChange, umbrales }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onStatusChange, onDelete, onDuplicate, catalogosUrgencia, catalogos, onUpdateSolicitudesOrder, onColumnOrderChange, umbrales, canEdit = false }) => {
     // Local state to handle visual reordering immediately
     const [localRequests, setLocalRequests] = useState<ITRequest[]>(requests);
+    
+    // Sync with props when they change externally
+    useEffect(() => {
+        setLocalRequests(requests);
+    }, [requests]);
+
     const [columns, setColumns] = useState<string[]>([]);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [activeType, setActiveType] = useState<'Task' | 'Column' | null>(null);
@@ -378,24 +389,58 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
         }
 
         // Task handling
-        const originalRequest = requests.find(r => r.id === activeId);
-        let newStatus: string | undefined;
+        const activeItem = localRequests.find(r => r.id === activeId);
+        const overStatus = columns.includes(overId) ? overId : localRequests.find(r => r.id === overId)?.status;
 
-        if (columns.includes(overId)) {
-            newStatus = overId;
-        } else {
-            const overTask = localRequests.find(r => r.id === overId);
-            newStatus = overTask?.status;
-        }
-
-        if (originalRequest && newStatus && originalRequest.status !== newStatus) {
+        // Case 1: Move to a different column
+        if (activeId !== overId && overStatus && activeItem && activeItem.status !== overStatus) {
+            const newStatus = overStatus as string;
+            
+            // Reorder and update status locally
+            const oldIndex = localRequests.findIndex(r => r.id === activeId);
+            const overIndex = localRequests.findIndex(r => r.id === overId);
+            
+            let newItems = [...localRequests];
+            const updatedItem = { ...newItems[oldIndex], status: newStatus };
+            newItems.splice(oldIndex, 1);
+            // If dropping over a task, insert before/after, otherwise push to new column
+            const insertionIndex = overIndex === -1 ? newItems.length : overIndex;
+            newItems.splice(insertionIndex, 0, updatedItem);
+            
+            setLocalRequests(newItems);
+            
+            // Persist status change
             onStatusChange(activeId, newStatus);
-        } else {
-            // Reorder within same column (not persisted yet in backend, but visual)
+            
+            // Persist order in the new column
+            if (onUpdateSolicitudesOrder) {
+                const itemsInNewCol = newItems.filter(r => r.status === newStatus);
+                const updates = itemsInNewCol.map((item, index) => ({
+                    id: item.id,
+                    orden: index
+                }));
+                onUpdateSolicitudesOrder(updates);
+            }
+        } 
+        // Case 2: Move within the same column
+        else if (activeId !== overId && activeItem) {
             const oldIndex = localRequests.findIndex((item) => item.id === activeId);
             const newIndex = localRequests.findIndex((item) => item.id === overId);
+            
             if (oldIndex !== newIndex) {
-                setLocalRequests((items) => arrayMove(items, oldIndex, newIndex));
+                const newItems = arrayMove(localRequests, oldIndex, newIndex);
+                setLocalRequests(newItems);
+                
+                // Persist the new order within the affected column
+                if (onUpdateSolicitudesOrder) {
+                    const affectedStatus = activeItem.status;
+                    const itemsInCol = newItems.filter(r => r.status === affectedStatus);
+                    const updates = itemsInCol.map((item, index) => ({
+                        id: item.id,
+                        orden: index
+                    }));
+                    onUpdateSolicitudesOrder(updates);
+                }
             }
         }
     };
@@ -446,6 +491,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
                             onDuplicate={onDuplicate}
                             catalogosUrgencia={catalogosUrgencia}
                             umbrales={umbrales}
+                            canEdit={canEdit}
                         />
                     ))}
                 </SortableContext>
@@ -461,6 +507,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ requests, onEdit, onSt
                             onDuplicate={undefined}
                             catalogosUrgencia={catalogosUrgencia}
                             umbrales={umbrales}
+                            canEditExternal={canEdit}
                             isOverlay
                         />
                     </div>

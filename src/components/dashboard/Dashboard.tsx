@@ -7,6 +7,7 @@ import { LayoutGrid, List, Search, Filter, Plus, DownloadCloud, Save, Trash2, X,
 import { supabase } from '../../lib/supabase/cliente';
 import { MultiSelectDropdown } from '../shared/MultiSelectDropdown';
 import { useAuth } from '../../hooks/useAuth';
+import { useUsuarios } from '../../hooks/useUsuarios';
 import { AIReviewModal } from '../shared/AIReviewModal';
 import { apuntesApi } from '../../lib/api/apuntes';
 
@@ -22,12 +23,15 @@ interface DashboardProps {
     onDeleteBulk: (ids: string[]) => void;
     catalogos: CatalogoItem[];
     onUpdateCatalogoOrder?: (newOrder: string[]) => void;
+    onUpdateSolicitudesOrder?: (updates: { id: string, orden: number }[]) => Promise<void>;
     onUpdateRequest: (id: string, data: Partial<ITRequest>) => Promise<void>;
     umbrales?: { yellow: number, red: number };
+    canEdit?: boolean;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onDuplicateRequest, onImportTickets, onStatusChange, onDelete, onDeleteBulk, catalogos, onUpdateCatalogoOrder, onUpdateRequest, umbrales }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditRequest, onNewRequest, onDuplicateRequest, onImportTickets, onStatusChange, onDelete, onDeleteBulk, catalogos, onUpdateCatalogoOrder, onUpdateSolicitudesOrder, onUpdateRequest, umbrales, canEdit = false }) => {
     const { user } = useAuth();
+    const { usuarios } = useUsuarios();
     const [isAIModalOpen, setIsAIModalOpen] = useState(false);
     const [isFiltersVisibleMobile, setIsFiltersVisibleMobile] = useState(false);
     const [viewMode, setViewMode] = useState<DashboardView>('Kanban');
@@ -41,7 +45,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
         ingresadoGestionDemanda: [],
         brm: [],
         search: '',
-        onlyMine: false
+        onlyMine: false,
+        assigneeIds: []
     });
 
     const filteredRequests = useMemo(() => {
@@ -69,6 +74,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
             
             // Filtro "Mis Iniciativas"
             if (filters.onlyMine && user && req.creadorId !== user.id) return false;
+
+            // Filtro por Responsables
+            if (filters.assigneeIds && filters.assigneeIds.length > 0 && (!req.assigneeId || !filters.assigneeIds.includes(req.assigneeId))) return false;
 
             return true;
         });
@@ -470,6 +478,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                     className="w-full sm:w-[150px]"
                 />
 
+                <MultiSelectDropdown
+                    label="Responsable"
+                    options={usuarios.map(u => u.nombre_completo)}
+                    selected={usuarios.filter(u => filters.assigneeIds?.includes(u.id)).map(u => u.nombre_completo)}
+                    onChange={(selectedNames) => {
+                        const selectedIds = usuarios
+                            .filter(u => selectedNames.includes(u.nombre_completo))
+                            .map(u => u.id);
+                        handleFilterArrayChange('assigneeIds', selectedIds);
+                    }}
+                    placeholder="Todos"
+                    className="w-[180px]"
+                />
+
                 <div className="flex items-center gap-2 w-full sm:w-auto bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-200">
                     <label className="text-xs font-bold text-slate-600 cursor-pointer flex items-center gap-2">
                         <input
@@ -527,7 +549,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         catalogosUrgencia={catalogos.filter(c => c.tipo === 'urgencia').sort((a, b) => (a.orden || 0) - (b.orden || 0))}
                         catalogos={catalogos}
                         onColumnOrderChange={onUpdateCatalogoOrder}
+                        onUpdateSolicitudesOrder={onUpdateSolicitudesOrder}
                         umbrales={umbrales}
+                        canEdit={canEdit}
                     />
                 ) : viewMode === 'Timeline' ? (
                     <TimelineBoard
@@ -544,6 +568,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ requests, domains, onEditR
                         onUpdateRequest={onUpdateRequest}
                         domains={domains}
                         catalogos={catalogos}
+                        canEdit={canEdit}
                     />
                 )}
             </div>

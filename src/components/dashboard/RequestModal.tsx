@@ -4,6 +4,7 @@ import type { SolicitudFecha, SolicitudApunte, UsuarioFavorito } from '../../lib
 import { apuntesApi } from '../../lib/api/apuntes';
 import { favoritosApi } from '../../lib/api/favoritos';
 import { useAuth } from '../../hooks/useAuth';
+import { useUsuarios } from '../../hooks/useUsuarios';
 import { X, Save, Calendar, Hash, FileText, History, User, Grid, Star, Plus, Trash2, Copy, Clock, Edit2 } from 'lucide-react';
 import { statusLogsApi } from '../../lib/api/statusLogs';
 
@@ -18,6 +19,7 @@ interface RequestModalProps {
     historialFechas?: SolicitudFecha[];
     umbrales?: { yellow: number, red: number };
     getModo?: (tipo: CatalogType) => 'desplegable' | 'cuadros';
+    canEditExternal?: boolean;
 }
 
 import { SelectorCampo } from '../shared/SelectorCampo';
@@ -27,24 +29,41 @@ const inputClass = "mt-1 block w-full rounded-md border-slate-300 shadow-sm focu
 const labelClass = "block text-xs font-semibold text-slate-600 uppercase tracking-wide";
 
 export const RequestModal: React.FC<RequestModalProps> = ({
-    isOpen, onClose, request, onSave, onDelete, domains, catalogos, historialFechas = [], umbrales, getModo
+    isOpen, onClose, request, onSave, onDelete, domains, catalogos, historialFechas = [], umbrales, getModo, canEditExternal = false
 }) => {
     const { perfil, user, esAdministrador } = useAuth();
     
     // Verificamos si el usuario actual tiene permisos para editar la solicitud actual
-    // Si no hay request (es una nueva), sí puede editar.
-    const canEdit = esAdministrador || !request || request.creadorId === user?.id;
+    // canEditExternal viene de los permisos del Espacio de Trabajo
+    const canEdit = esAdministrador || !request || request.creadorId === user?.id || canEditExternal;
     const isReadOnly = !canEdit;
 
     // Filtrar catálogos activos
     const getCats = (tipo: CatalogType) => catalogos.filter(c => c.tipo === tipo && c.esta_activo);
 
+    const { usuarios: usuariosSistema } = useUsuarios();
+
     // Obtener cada lista para pasarlas al render
     const tiposReq = getCats('tipo_requerimiento');
     const urgencias = getCats('urgencia');
     const estados = getCats('estado');
-    const usuarios = getCats('usuario_solicitante');
-    const asignados = getCats('asignado_a');
+    
+    // Transformamos usuarios del sistema al formato CatalogoItem para el SelectorCampo
+    const listaUsuariosSistema = usuariosSistema.map(u => ({
+        id: u.id,
+        valor: u.nombre_completo,
+        esta_activo: true,
+        tipo: 'usuario_solicitante'
+    } as CatalogoItem));
+
+    const usuariosCatalogo = getCats('usuario_solicitante');
+    const usuarios = usuariosCatalogo.length > 0 ? usuariosCatalogo : listaUsuariosSistema;
+    
+    const asignadosCatalogo = getCats('asignado_a');
+    const asignados = asignadosCatalogo.length > 0 ? asignadosCatalogo : listaUsuariosSistema;
+    
+    const prioridades = getCats('prioridad');
+    
     const direcciones = getCats('direccion_solicitante');
     const brms = getCats('brm');
     const instituciones = getCats('institucion');
@@ -664,12 +683,10 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                         valor={formData.assigneeId || ''} onChange={v => set('assigneeId', v || null)} disabled={isReadOnly}
                                         opciones={asignados} modo={getM('asignado_a')} placeholder="-- Sin asignar --" />
 
-                                    <div className="col-span-6 sm:col-span-2">
-                                        <label className={labelClass}>Prioridad</label>
-                                        <input type="text" className={inputClass} disabled={isReadOnly}
-                                            value={formData.priority || ''} onChange={e => set('priority', e.target.value)}
-                                            placeholder="P-001" />
-                                    </div>
+                                    <SelectorCampo label="Prioridad"
+                                        valor={formData.priority || ''} onChange={v => set('priority', v)} disabled={isReadOnly}
+                                        opciones={prioridades} modo={getM('prioridad')}
+                                        placeholder={prioridades.length === 0 ? "Ej: P-001" : "-- Selecciona --"} />
                                     <div className="col-span-6 sm:col-span-2">
                                         <label className={labelClass}>Tarea SN</label>
                                         <input type="text" className={inputClass} disabled={isReadOnly}

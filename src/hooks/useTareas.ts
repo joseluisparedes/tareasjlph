@@ -1,30 +1,34 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase/cliente';
 import type { Tarea, TareaColumna, TareaLog } from '../lib/supabase/tipos-bd';
 import { useAuth } from './useAuth';
+import { useWorkspaces } from './useWorkspaces';
 import * as XLSX from 'xlsx';
 
 const sortTareas = (tareas: Tarea[]) => {
-    const pesos = { 'Rojo': 1, 'Amarillo': 2, 'Verde': 3 } as Record<string, number>;
-    return [...tareas].sort((a, b) => {
-        const wA = pesos[a.urgencia] || 4;
-        const wB = pesos[b.urgencia] || 4;
-        if (wA !== wB) return wA - wB;
-        return a.orden - b.orden;
-    });
+    return [...tareas].sort((a, b) => a.orden - b.orden);
 };
 
 export function useTareas() {
     const { user } = useAuth();
+    const { currentWorkspace } = useWorkspaces();
     const [tareas, setTareas] = useState<Tarea[]>([]);
     const [columnas, setColumnas] = useState<TareaColumna[]>([]);
     const [cargando, setCargando] = useState(true);
 
+    const workspaceId = currentWorkspace?.id;
+
     const cargarDatos = async (silencioso = false) => {
+        if (!user || !workspaceId) {
+            setTareas([]);
+            setColumnas([]);
+            setCargando(false);
+            return;
+        }
         try {
             if (!silencioso) setCargando(true);
-            let tareasQuery = supabase.from('tareas').select('*').order('orden', { ascending: true });
-            let colsQuery = supabase.from('tareas_columnas').select('*').order('orden', { ascending: true });
+            let tareasQuery = supabase.from('tareas').select('*').eq('espacio_id', workspaceId).order('orden', { ascending: true });
+            let colsQuery = supabase.from('tareas_columnas').select('*').eq('espacio_id', workspaceId).order('orden', { ascending: true });
 
             const [colsResponse, tareasResponse] = await Promise.all([
                 colsQuery,
@@ -43,21 +47,27 @@ export function useTareas() {
         }
     };
 
+    const lastState = useRef<{ userId: string | null, workspaceId: string | null }>({ userId: null, workspaceId: null });
+
     useEffect(() => {
-        if (!user) return;
-        cargarDatos();
+        if (!user || !workspaceId) return;
+
+        if (lastState.current.userId !== user.id || lastState.current.workspaceId !== workspaceId) {
+            lastState.current = { userId: user.id, workspaceId };
+            cargarDatos();
+        }
         
         const subscriptionTareas = supabase
-            .channel('tareas_cambios')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'tareas' }, () => {
-                cargarDatos(true); // Carga silenciosa para actualizaciones externas
+            .channel(`tareas_cambios_${workspaceId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tareas', filter: `espacio_id=eq.${workspaceId}` }, () => {
+                cargarDatos(true);
             })
             .subscribe();
 
         const subscriptionColumnas = supabase
-            .channel('columnas_cambios')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'tareas_columnas' }, () => {
-                cargarDatos(true); // Carga silenciosa para actualizaciones externas
+            .channel(`columnas_cambios_${workspaceId}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tareas_columnas', filter: `espacio_id=eq.${workspaceId}` }, () => {
+                cargarDatos(true);
             })
             .subscribe();
 
@@ -65,7 +75,7 @@ export function useTareas() {
             subscriptionTareas.unsubscribe();
             subscriptionColumnas.unsubscribe();
         };
-    }, [user]);
+    }, [user, workspaceId]);
 
     const crearColumna = async (nombre: string) => {
         const orden = columnas.length;
@@ -77,7 +87,7 @@ export function useTareas() {
 
         const { data, error } = await supabase
             .from('tareas_columnas')
-            .insert([{ nombre, orden, creado_por: user?.id || null }])
+            .insert([{ nombre, orden, creado_por: user?.id || null, espacio_id: workspaceId }])
             .select()
             .single();
 
@@ -174,7 +184,8 @@ export function useTareas() {
                 orden,
                 creado_por: user?.id,
                 responsable_id: finalResponsableId,
-                fecha_asignacion: new Date().toISOString()
+                fecha_asignacion: new Date().toISOString(),
+                espacio_id: workspaceId
             }])
             .select()
             .single();

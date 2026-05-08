@@ -18,6 +18,7 @@ interface RequestTableProps {
     onUpdateRequest?: (id: string, data: Partial<ITRequest>) => Promise<void>;
     domains?: CatalogItem[];
     catalogos?: CatalogoItem[];
+    canEdit?: boolean;
 }
 
 const PriorityBadge: React.FC<{ priority: string; catalogos?: CatalogoItem[] }> = ({ priority, catalogos }) => {
@@ -147,7 +148,7 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({ id, children, onClick, 
     );
 };
 
-export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, onDelete, onDeleteBulk, catalogosUrgencia, onUpdateRequest, domains, catalogos }) => {
+export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, onDelete, onDeleteBulk, catalogosUrgencia, onUpdateRequest, domains, catalogos, canEdit: canEditExternal = false }) => {
     const { user, esAdministrador } = useAuth();
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -276,7 +277,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
 
     // Render Editable Cell
     const renderCellContent = (req: ITRequest, col: ColumnConfig & { id: string }) => {
-        const canEdit = esAdministrador || req.creadorId === user?.id;
+        const canEdit = esAdministrador || req.creadorId === user?.id || canEditExternal;
         const isEditableCol = col.editable && canEdit;
         const isEditing = editingCell?.id === req.id && editingCell?.field === col.key;
         const value = isEditing ? editingCell.value : req[col.key];
@@ -361,7 +362,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         { id: 'id', key: 'id' as keyof ITRequest, label: 'ID', sortable: true, editable: false },
         {
             id: 'apuntes', key: 'id' as keyof ITRequest, label: 'Apuntes y Actualizaciones', sortable: false, editable: false,
-            render: (req) => <NotesCell requestId={req.id} canEdit={esAdministrador || req.creadorId === user?.id} />
+            render: (req) => <NotesCell requestId={req.id} canEdit={esAdministrador || req.creadorId === user?.id || canEditExternal} />
         },
         {
             id: 'title', key: 'title', label: 'Título', sortable: true, editable: true, inputType: 'text',
@@ -514,7 +515,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
     const toggleSelectAll = () => {
         // Solo seleccionar las que puede eliminar
         const selectableIds = requests
-            .filter(r => esAdministrador || r.creadorId === user?.id)
+            .filter(r => esAdministrador || r.creadorId === user?.id || canEditExternal)
             .map(r => r.id);
             
         if (selectedIds.size === selectableIds.length && selectableIds.length > 0) {
@@ -636,7 +637,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         setVisibleColumns(newVisible);
     };
 
-    const selectableCount = requests.filter(r => esAdministrador || r.creadorId === user?.id).length;
+    const selectableCount = requests.filter(r => esAdministrador || r.creadorId === user?.id || canEditExternal).length;
     const isAllSelected = selectableCount > 0 && selectedIds.size === selectableCount;
     const isIndeterminate = selectedIds.size > 0 && selectedIds.size < selectableCount;
 
@@ -758,7 +759,7 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
                         {sortedRequests.map((req) => {
-                            const canEdit = esAdministrador || req.creadorId === user?.id;
+                            const canEdit = esAdministrador || req.creadorId === user?.id || canEditExternal;
                             const isSelected = selectedIds.has(req.id);
                             return (
                                 <tr

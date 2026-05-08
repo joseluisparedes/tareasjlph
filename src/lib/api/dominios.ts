@@ -2,36 +2,40 @@ import { supabase } from '../supabase/cliente';
 import type { Dominio } from '../supabase/tipos-bd';
 
 export const dominiosApi = {
-    async obtenerTodos(): Promise<Dominio[]> {
+    async obtenerTodos(espacioId: string): Promise<Dominio[]> {
         const { data, error } = await supabase
             .from('dominios')
             .select('*')
+            .eq('espacio_id', espacioId)
+            .order('orden', { ascending: true })
             .order('nombre');
         if (error) throw error;
         return data ?? [];
     },
 
-    async obtenerActivos(): Promise<Dominio[]> {
+    async obtenerActivos(espacioId: string): Promise<Dominio[]> {
         const { data, error } = await supabase
             .from('dominios')
             .select('*')
+            .eq('espacio_id', espacioId)
             .eq('esta_activo', true)
+            .order('orden', { ascending: true })
             .order('nombre');
         if (error) throw error;
         return data ?? [];
     },
 
-    async crear(nombre: string): Promise<Dominio> {
+    async crear(nombre: string, espacioId: string): Promise<Dominio> {
         const { data, error } = await supabase
             .from('dominios')
-            .insert({ nombre, esta_activo: true })
+            .insert({ nombre, esta_activo: true, espacio_id: espacioId })
             .select()
             .single();
         if (error) throw error;
         return data;
     },
 
-    async actualizar(id: string, cambios: Partial<Pick<Dominio, 'nombre' | 'esta_activo'>>): Promise<Dominio> {
+    async actualizar(id: string, cambios: Partial<Pick<Dominio, 'nombre' | 'esta_activo' | 'orden'>>): Promise<Dominio> {
         const { data, error } = await supabase
             .from('dominios')
             .update(cambios)

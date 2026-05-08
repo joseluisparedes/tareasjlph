@@ -1,18 +1,28 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase/cliente';
+import { useWorkspaces } from './useWorkspaces';
 import { ActividadCalendario } from '../types';
 
 export function useCalendario() {
+    const { currentWorkspace } = useWorkspaces();
     const [actividades, setActividades] = useState<ActividadCalendario[]>([]);
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    const workspaceId = currentWorkspace?.id;
+
     const cargarActividades = async (silencioso = false) => {
+        if (!workspaceId) {
+            setActividades([]);
+            setCargando(false);
+            return;
+        }
         try {
             if (!silencioso) setCargando(true);
             const { data, error } = await supabase
                 .from('actividades_calendario')
                 .select(`*`)
+                .eq('espacio_id', workspaceId)
                 .order('fecha_inicio', { ascending: true });
 
             if (error) throw error;
@@ -44,8 +54,10 @@ export function useCalendario() {
     };
 
     useEffect(() => {
-        cargarActividades();
-    }, []);
+        if (workspaceId) {
+            cargarActividades();
+        }
+    }, [workspaceId]);
 
     const crearActividad = async (actividad: Omit<ActividadCalendario, 'id' | 'creado_por_nombre' | 'fecha_creacion'>) => {
         const { data, error } = await supabase
@@ -57,7 +69,8 @@ export function useCalendario() {
                 fecha_fin: actividad.fecha_fin,
                 hora_inicio: actividad.hora_inicio || null,
                 hora_fin: actividad.hora_fin || null,
-                creado_por: actividad.creado_por
+                creado_por: actividad.creado_por,
+                espacio_id: workspaceId
             }])
             .select()
             .single();

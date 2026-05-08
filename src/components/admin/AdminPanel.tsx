@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CatalogItem, CatalogoItem, CatalogType, User, ITRequest } from '../../types';
-import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, Edit2, Save, X, Plus, Tag, LayoutGrid, List, GripVertical, ChevronDown } from 'lucide-react';
+import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, Edit2, Save, X, Plus, Tag, LayoutGrid, List, GripVertical, ChevronDown, Users, Settings, Briefcase } from 'lucide-react';
 import { useUsuarios } from '../../hooks/useUsuarios';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import { useWorkspaces } from '../../hooks/useWorkspaces';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -12,6 +13,7 @@ interface AdminPanelProps {
     users: User[];
     onUpdateDomain: (domain: CatalogItem) => void;
     onAddDomain: (name: string) => void;
+    onDeleteDomain?: (id: string) => void;
     catalogos: CatalogoItem[];
     onAddCatalogo: (tipo: CatalogType, valor: string) => void;
     onUpdateCatalogo: (id: string, cambios: Partial<Pick<CatalogoItem, 'valor' | 'esta_activo' | 'color' | 'abreviatura' | 'orden'>>) => void;
@@ -21,9 +23,10 @@ interface AdminPanelProps {
     requests: ITRequest[];
 }
 
-type AdminTab = 'domains' | 'catalogs' | 'users' | 'settings';
+type AdminTab = 'catalogs' | 'users' | 'workspaces' | 'settings';
 
 const CATALOG_SECTIONS: { tipo: CatalogType; label: string }[] = [
+    { tipo: 'dominios', label: 'Dominios TI' },
     { tipo: 'tipo_requerimiento', label: 'Tipo de Requerimiento' },
     { tipo: 'urgencia', label: 'Urgencia' },
     { tipo: 'prioridad', label: 'Prioridad' },
@@ -264,37 +267,88 @@ const CatalogSection: React.FC<{
                     )}
                 </>
             )}
+            <div className="bg-slate-50/50 px-4 py-1.5 border-t border-slate-100 flex items-center justify-end">
+                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight italic">
+                    Valores aislados por Ecosistema
+                </span>
+            </div>
         </div>
     );
 };
 
 // ─── Componente principal ────────────────────────────────────────────────────
 export const AdminPanel: React.FC<AdminPanelProps> = ({
-    domains, users: initialUsers, onUpdateDomain, onAddDomain,
+    domains, users: initialUsers, onUpdateDomain, onAddDomain, onDeleteDomain,
     catalogos, onAddCatalogo, onUpdateCatalogo, onDeleteCatalogo,
     getModo, setModo, requests
 }) => {
-    const { usuarios, cargando: cargandoUsuarios, actualizarUsuario, eliminarUsuario } = useUsuarios();
-    const { permitirRegistro, actualizarPermisoRegistro, umbrales, actualizarUmbrales, cargando: cargandoSettings } = useAppSettings();
-    const [activeTab, setActiveTab] = useState<AdminTab>('domains');
+    const { 
+        workspaces, 
+        currentWorkspace, 
+        crearWorkspace, 
+        obtenerMiembros, 
+        agregarMiembro, 
+        actualizarMiembro, 
+        removerMiembro 
+    } = useWorkspaces();
+    const { usuarios, cargando: cargandoUsuarios, actualizarUsuario, eliminarUsuario } = useUsuarios({ global: true });
+    const { permitirRegistro, actualizarPermisoRegistro, umbrales, actualizarUmbrales, cargando: cargandoSettings } = useAppSettings(currentWorkspace?.id);
+    const [activeTab, setActiveTab] = useState<AdminTab>('catalogs');
+    const [isThresholdsOpen, setIsThresholdsOpen] = useState(false);
     
     // Estados para umbrales temporales en el formulario
     const [tempYellow, setTempYellow] = useState<number>(umbrales.yellow);
     const [tempRed, setTempRed] = useState<number>(umbrales.red);
 
-    // Sincronizar umbrales cuando carguen
-    React.useEffect(() => {
+    useEffect(() => {
         setTempYellow(umbrales.yellow);
         setTempRed(umbrales.red);
     }, [umbrales]);
-    const [isAddingDomain, setIsAddingDomain] = useState(false);
-    const [newDomainName, setNewDomainName] = useState('');
-    const [editingDomainId, setEditingDomainId] = useState<string | null>(null);
-    const [editName, setEditName] = useState('');
 
     const [editingUserId, setEditingUserId] = useState<string | null>(null);
     const [editUserName, setEditUserName] = useState('');
     const [editUserRole, setEditUserRole] = useState('');
+
+    const [wsMembers, setWsMembers] = useState<any[]>([]);
+    const [cargandoMembers, setCargandoMembers] = useState(false);
+    const [isAddingWs, setIsAddingWs] = useState(false);
+    const [newWsName, setNewWsName] = useState('');
+    const [isAddingMember, setIsAddingMember] = useState(false);
+    const [selectedUserForWs, setSelectedUserForWs] = useState('');
+
+    const handleUpdateMember = async (memberId: string, cambios: Partial<WorkspaceMember>) => {
+        // 1. Actualización optimista local para respuesta instantánea
+        setWsMembers(prev => prev.map(m => m.id === memberId ? { ...m, ...cambios } : m));
+        
+        try {
+            // 2. Persistir en DB
+            await actualizarMiembro(memberId, cambios);
+        } catch (e) {
+            console.error(e);
+            alert("No se pudo actualizar el permiso en el servidor.");
+            // 3. Revertir si hay error (recargando de la DB)
+            cargarMiembros();
+        }
+    };
+
+    const cargarMiembros = async (showLoader = true) => {
+        if (!currentWorkspace) return;
+        if (showLoader) setCargandoMembers(true);
+        try {
+            const data = await obtenerMiembros(currentWorkspace.id);
+            setWsMembers(data);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            if (showLoader) setCargandoMembers(false);
+        }
+    };
+
+    React.useEffect(() => {
+        if (activeTab === 'workspaces' && currentWorkspace) {
+            cargarMiembros();
+        }
+    }, [activeTab, currentWorkspace]);
 
     const handleSaveUser = async (id: string) => {
         if (editUserName.trim() && editUserRole.trim()) {
@@ -312,20 +366,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         }
     };
 
-    const handleToggleDomain = (domain: CatalogItem) => {
-        if (confirm(`¿${domain.isActive ? 'Desactivar' : 'Activar'} el dominio "${domain.name}"?`)) {
-            onUpdateDomain({ ...domain, isActive: !domain.isActive });
-        }
-    };
 
-    const handleSaveNewDomain = () => {
-        if (newDomainName.trim()) { onAddDomain(newDomainName.trim()); setNewDomainName(''); setIsAddingDomain(false); }
-    };
 
     const tabs: { id: AdminTab; label: string }[] = [
-        { id: 'domains', label: 'Dominios TI' },
         { id: 'catalogs', label: 'Catálogos' },
-        { id: 'users', label: 'Usuarios' },
+        { id: 'users', label: 'Usuarios Globales' },
+        { id: 'workspaces', label: 'Espacios de Trabajo' },
         { id: 'settings', label: 'Configuración' },
     ];
 
@@ -333,10 +379,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 h-full flex flex-col overflow-hidden">
             {/* Header */}
             <div className="border-b border-slate-200 px-6 py-5 flex-shrink-0">
-                <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                    <Shield className="text-blue-600" size={22} /> Panel de Administración
-                </h2>
-                <p className="text-slate-500 text-sm mt-1">Gestiona dominios, catálogos de valores y usuarios del sistema.</p>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <Shield className="text-blue-600" size={22} /> Panel de Administración
+                        </h2>
+                        <p className="text-slate-500 text-sm mt-1">Gestiona dominios, catálogos de valores y usuarios del sistema.</p>
+                    </div>
+                    {currentWorkspace && (
+                        <div className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-700 rounded-xl shadow-lg">
+                            <div className="flex flex-col items-end text-right">
+                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter leading-none mb-1">Espacio de Trabajo</span>
+                                <span className="text-xs font-extrabold text-blue-400 uppercase tracking-widest leading-none">
+                                    {currentWorkspace.nombre}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="flex flex-1 min-h-0 overflow-hidden">
@@ -353,87 +413,47 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 {/* Content */}
                 <div className="flex-1 p-6 overflow-y-auto">
 
-                    {/* ── TAB: Dominios TI ── */}
-                    {activeTab === 'domains' && (
-                        <div>
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="font-semibold text-lg text-slate-800">Dominios TI</h3>
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        onClick={() => setModo('dominios', getModo('dominios') === 'desplegable' ? 'cuadros' : 'desplegable')}
-                                        title={getModo('dominios') === 'desplegable' ? 'Cambiar a cuadros de selección rápida' : 'Cambiar a lista desplegable'}
-                                        className={`flex items-center gap-1.5 text-xs px-2.5 py-2 rounded-lg border font-medium transition-colors ${getModo('dominios') === 'cuadros'
-                                            ? 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'
-                                            : 'bg-slate-100 border-slate-300 text-slate-500 hover:bg-slate-200'
-                                            }`}
-                                    >
-                                        {getModo('dominios') === 'cuadros' ? <LayoutGrid size={14} /> : <List size={14} />}
-                                        {getModo('dominios') === 'cuadros' ? 'Vista Cuadros' : 'Vista Desplegable'}
-                                    </button>
-                                    <button onClick={() => setIsAddingDomain(true)}
-                                        className="flex items-center gap-2 text-sm bg-slate-800 text-white px-3 py-2 rounded-lg hover:bg-slate-700">
-                                        <FolderPlus size={15} /> Agregar Dominio
-                                    </button>
-                                </div>
-                            </div>
-
-                            {isAddingDomain && (
-                                <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200 flex items-center gap-2">
-                                    <input autoFocus type="text" placeholder="Nombre del nuevo dominio TI"
-                                        className="flex-1 border border-slate-300 rounded-md px-3 py-2 text-sm bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 outline-none"
-                                        value={newDomainName} onChange={e => setNewDomainName(e.target.value)}
-                                        onKeyDown={e => { if (e.key === 'Enter') handleSaveNewDomain(); if (e.key === 'Escape') setIsAddingDomain(false); }} />
-                                    <button onClick={handleSaveNewDomain} className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><Save size={15} /></button>
-                                    <button onClick={() => setIsAddingDomain(false)} className="p-2 text-slate-500 hover:bg-slate-200 rounded-lg"><X size={15} /></button>
-                                </div>
-                            )}
-
-                            <div className="rounded-lg border border-slate-200 overflow-hidden">
-                                {domains.map(domain => (
-                                    <div key={domain.id} className="flex items-center justify-between p-4 border-b border-slate-100 last:border-0 bg-white hover:bg-slate-50 transition-colors">
-                                        <div className="flex items-center gap-3 flex-1">
-                                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${domain.isActive ? 'bg-green-500' : 'bg-red-400'}`} />
-                                            {editingDomainId === domain.id ? (
-                                                <div className="flex items-center gap-2 flex-1 max-w-sm">
-                                                    <input type="text"
-                                                        className="flex-1 border border-slate-300 rounded px-2 py-1 text-sm bg-white text-slate-900 focus:ring-1 focus:ring-blue-500 outline-none"
-                                                        value={editName} onChange={e => setEditName(e.target.value)} />
-                                                    <button onClick={() => { if (editName.trim()) { onUpdateDomain({ ...domain, name: editName.trim() }); setEditingDomainId(null); } }} className="text-green-600 hover:bg-green-50 p-1 rounded"><Save size={14} /></button>
-                                                    <button onClick={() => setEditingDomainId(null)} className="text-red-500 hover:bg-red-50 p-1 rounded"><X size={14} /></button>
-                                                </div>
-                                            ) : (
-                                                <>
-                                                    <span className={`font-medium text-sm ${!domain.isActive ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{domain.name}</span>
-                                                    {!domain.isActive && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactivo</span>}
-                                                    <button onClick={() => { setEditingDomainId(domain.id); setEditName(domain.name); }} className="text-slate-400 hover:text-blue-600 p-1 rounded hover:bg-slate-100"><Edit2 size={13} /></button>
-                                                </>
-                                            )}
-                                        </div>
-                                        <button onClick={() => handleToggleDomain(domain)}
-                                            className={`text-xs px-3 py-1.5 rounded border transition-colors ${domain.isActive ? 'border-red-200 text-red-600 hover:bg-red-50' : 'border-green-200 text-green-600 hover:bg-green-50'}`}>
-                                            {domain.isActive ? 'Desactivar' : 'Activar'}
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                            <p className="mt-3 text-xs text-slate-400 flex items-center gap-1">
-                                <AlertTriangle size={11} /> Desactivar un dominio no elimina las solicitudes históricas.
-                            </p>
-                        </div>
-                    )}
-
-                    {/* ── TAB: Catálogos ── */}
+                    {/* ── TAB: Catálogos (Incluye Dominios y Listas de Valores) ── */}
                     {activeTab === 'catalogs' && (
-                        <div>
-                            <div className="mb-5">
-                                <h3 className="font-semibold text-lg text-slate-800">Catálogos de Valores</h3>
-                                <p className="text-sm text-slate-500 mt-1">
-                                    Configura los valores y el modo de visualización de cada campo del formulario.
-                                    Usa <span className="font-semibold text-violet-600">Cuadros</span> para selección rápida con abreviatura, o <span className="font-semibold text-slate-600">Desplegable</span> para listas largas.
-                                </p>
-                            </div>
-                            <div className="grid grid-cols-1 gap-4">
-                                {CATALOG_SECTIONS.map(({ tipo, label }) => (
+                        <div className="space-y-4">
+                            {CATALOG_SECTIONS.map(({ tipo, label }) => {
+                                // Mapeo especial para Dominios TI
+                                if (tipo === 'dominios') {
+                                    const domainItems: CatalogoItem[] = domains.map(d => ({
+                                        id: d.id,
+                                        valor: d.name,
+                                        tipo: 'dominios',
+                                        esta_activo: d.isActive,
+                                        orden: d.orden || 0
+                                    }));
+
+                                    return (
+                                        <CatalogSection
+                                            key="dominios"
+                                            tipo="dominios"
+                                            label="Dominios TI"
+                                            items={domainItems}
+                                            modo={getModo('dominios')}
+                                            onAdd={(_, val) => onAddDomain(val)}
+                                            onUpdate={(id, cambios) => {
+                                                const d = domains.find(x => x.id === id);
+                                                if (!d) return;
+                                                onUpdateDomain({
+                                                    ...d,
+                                                    name: cambios.valor !== undefined ? cambios.valor : d.name,
+                                                    isActive: cambios.esta_activo !== undefined ? cambios.esta_activo : d.isActive,
+                                                    orden: cambios.orden !== undefined ? cambios.orden : d.orden
+                                                });
+                                            }}
+                                            onDelete={onDeleteDomain || (() => {})}
+                                            onToggleModo={() => setModo('dominios', getModo('dominios') === 'desplegable' ? 'cuadros' : 'desplegable')}
+                                            requests={requests}
+                                        />
+                                    );
+                                }
+
+                                // Renderizado normal para el resto de catálogos
+                                return (
                                     <CatalogSection
                                         key={tipo}
                                         tipo={tipo}
@@ -446,7 +466,75 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                         onToggleModo={() => setModo(tipo, getModo(tipo) === 'desplegable' ? 'cuadros' : 'desplegable')}
                                         requests={requests}
                                     />
-                                ))}
+                                );
+                            })}
+
+                            {/* ── Sección Umbrales del Semáforo (Configuración por Espacio) ── */}
+                            <div className="border border-slate-200 rounded-xl bg-white overflow-hidden shadow-sm">
+                                <button
+                                    onClick={() => setIsThresholdsOpen(!isThresholdsOpen)}
+                                    className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                                            <AlertTriangle size={20} />
+                                        </div>
+                                        <div className="text-left">
+                                            <h3 className="font-bold text-slate-800">Umbrales del Semáforo de Tiempo</h3>
+                                            <p className="text-xs text-slate-500">Define cuándo cambian de color las iniciativas según su antigüedad en el mismo estado.</p>
+                                        </div>
+                                    </div>
+                                    <ChevronDown size={20} className={`text-slate-400 transition-transform ${isThresholdsOpen ? 'rotate-180' : ''}`} />
+                                </button>
+                                
+                                {isThresholdsOpen && (
+                                    <div className="p-6 border-t border-slate-100 bg-slate-50/30">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full bg-yellow-400" />
+                                                    Días para Alerta Amarilla
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                                    value={tempYellow}
+                                                    onChange={e => setTempYellow(parseInt(e.target.value) || 0)}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full bg-red-500" />
+                                                    Días para Alerta Roja (Crítica)
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    className="w-full border border-slate-200 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                                                    value={tempRed}
+                                                    onChange={e => setTempRed(parseInt(e.target.value) || 0)}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="mt-6 flex justify-end">
+                                            <button
+                                                onClick={async () => {
+                                                    await actualizarUmbrales(tempYellow, tempRed);
+                                                    alert('Umbrales actualizados correctamente para este espacio.');
+                                                }}
+                                                className="bg-blue-600 text-white px-6 py-2 rounded-xl text-sm font-bold hover:bg-blue-700 shadow-lg shadow-blue-600/20 transition-all flex items-center gap-2"
+                                            >
+                                                <Save size={16} /> Guardar Configuración
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="bg-slate-50/50 px-4 py-1.5 border-t border-slate-100 flex items-center justify-end">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tight italic">
+                                        Configuración local del Ecosistema
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -580,6 +668,171 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                         </div>
                     )}
 
+                    {/* ── TAB: Espacios de Trabajo ── */}
+                    {activeTab === 'workspaces' && (
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h3 className="font-semibold text-lg text-slate-800">Grupos de Trabajo</h3>
+                                    <p className="text-sm text-slate-500 mt-0.5">Crea espacios aislados y gestiona quién tiene acceso a cada uno.</p>
+                                </div>
+                                <button 
+                                    onClick={() => setIsAddingWs(true)}
+                                    className="flex items-center gap-2 text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 shadow-sm"
+                                >
+                                    <Briefcase size={15} /> Nuevo Grupo
+                                </button>
+                            </div>
+
+                            {isAddingWs && (
+                                <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-bold text-blue-700 uppercase mb-1">Nombre del Grupo</label>
+                                        <input 
+                                            autoFocus
+                                            type="text"
+                                            placeholder="Ej. Frente Comercial"
+                                            className="w-full border-blue-200 rounded-lg px-3 py-2 text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                                            value={newWsName}
+                                            onChange={e => setNewWsName(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex items-end gap-2 pt-5">
+                                        <button 
+                                            onClick={async () => {
+                                                if (newWsName.trim()) {
+                                                    await crearWorkspace(newWsName.trim());
+                                                    setNewWsName('');
+                                                    setIsAddingWs(false);
+                                                }
+                                            }}
+                                            className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+                                        >
+                                            Crear
+                                        </button>
+                                        <button onClick={() => setIsAddingWs(false)} className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-100 rounded-lg">Cancelar</button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Gestión de Miembros del Workspace Activo */}
+                            <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden">
+                                <div className="px-5 py-4 border-b border-slate-200 bg-white flex justify-between items-center">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600">
+                                            <Users size={20} />
+                                        </div>
+                                        <div>
+                                            <h4 className="font-bold text-slate-800">Miembros de: {currentWorkspace?.nombre}</h4>
+                                            <p className="text-xs text-slate-500">Define roles de Lectura o Edición para este grupo específico.</p>
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => setIsAddingMember(true)}
+                                        className="text-sm flex items-center gap-2 text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg font-medium transition-colors"
+                                    >
+                                        <UserPlus size={15} /> Añadir Miembro
+                                    </button>
+                                </div>
+
+                                {isAddingMember && (
+                                    <div className="p-4 border-b border-slate-200 bg-white flex items-end gap-3 animate-in fade-in">
+                                        <div className="flex-1">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Seleccionar Usuario</label>
+                                            <select 
+                                                className="w-full border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                                value={selectedUserForWs}
+                                                onChange={e => setSelectedUserForWs(e.target.value)}
+                                            >
+                                                <option value="">Seleccionar...</option>
+                                                {usuarios.filter(u => !wsMembers.some(m => m.usuario_id === u.id)).map(u => (
+                                                    <option key={u.id} value={u.id}>{u.nombre_completo} ({u.correo_electronico})</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button 
+                                                disabled={!selectedUserForWs}
+                                                onClick={async () => {
+                                                    if (selectedUserForWs && currentWorkspace) {
+                                                        await agregarMiembro(currentWorkspace.id, selectedUserForWs, 'lectura', 'lectura');
+                                                        setSelectedUserForWs('');
+                                                        setIsAddingMember(false);
+                                                        cargarMiembros();
+                                                    }
+                                                }}
+                                                className="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 disabled:opacity-50"
+                                            >
+                                                Añadir
+                                            </button>
+                                            <button onClick={() => setIsAddingMember(false)} className="px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50 rounded-lg">Cerrar</button>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="p-0">
+                                    <table className="min-w-full divide-y divide-slate-200">
+                                        <thead className="bg-slate-100/50">
+                                            <tr>
+                                                <th className="px-6 py-3 text-left text-[10px] font-bold text-slate-500 uppercase">Miembro</th>
+                                                <th className="px-6 py-3 text-center text-[10px] font-bold text-slate-500 uppercase">Iniciativas</th>
+                                                <th className="px-6 py-3 text-center text-[10px] font-bold text-slate-500 uppercase">Tareas</th>
+                                                <th className="px-6 py-3 text-right text-[10px] font-bold text-slate-500 uppercase">Acciones</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="bg-white divide-y divide-slate-100">
+                                            {cargandoMembers ? (
+                                                <tr><td colSpan={4} className="py-8 text-center text-slate-400 text-sm">Cargando miembros...</td></tr>
+                                            ) : wsMembers.length === 0 ? (
+                                                <tr><td colSpan={4} className="py-8 text-center text-slate-400 text-sm">No hay miembros en este grupo aún.</td></tr>
+                                            ) : wsMembers.map(m => (
+                                                <tr key={m.id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-6 py-4">
+                                                        <div className="font-medium text-slate-700 text-sm">{m.usuarios?.nombre_completo}</div>
+                                                        <div className="text-[10px] text-slate-400 font-mono">{m.usuarios?.correo_electronico}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <select 
+                                                            className={`text-xs font-semibold rounded-full px-3 py-1 border outline-none transition-colors cursor-pointer ${m.rol_iniciativas === 'edicion' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}
+                                                            value={m.rol_iniciativas}
+                                                            onChange={(e) => handleUpdateMember(m.id, { rol_iniciativas: e.target.value as any })}
+                                                        >
+                                                            <option value="lectura">Lectura</option>
+                                                            <option value="edicion">Edición</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                                                        <select 
+                                                            className={`text-xs font-semibold rounded-full px-3 py-1 border outline-none transition-colors cursor-pointer ${m.rol_tareas === 'edicion' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-700 border-slate-200'}`}
+                                                            value={m.rol_tareas}
+                                                            onChange={(e) => handleUpdateMember(m.id, { rol_tareas: e.target.value as any })}
+                                                        >
+                                                            <option value="lectura">Lectura</option>
+                                                            <option value="edicion">Edición</option>
+                                                        </select>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <button 
+                                                            onClick={async () => {
+                                                                if(confirm('¿Remover a este usuario del grupo?')) {
+                                                                    await removerMiembro(m.id);
+                                                                    cargarMiembros();
+                                                                }
+                                                            }}
+                                                            className="p-1.5 text-slate-300 hover:text-red-500 transition-colors"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* ── TAB: Configuración ── */}
                     {activeTab === 'settings' && (
                         <div className="space-y-8">
@@ -619,66 +872,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                 </div>
                             </div>
 
-                            {/* Semáforo de Tiempos */}
-                            <div className="p-5 bg-white border border-slate-200 rounded-xl shadow-sm">
-                                <h4 className="font-semibold text-slate-800 flex items-center gap-2 mb-4">
-                                    <AlertTriangle size={18} className="text-amber-500" />
-                                    Umbrales del Semáforo de Tiempo
-                                </h4>
-                                <p className="text-sm text-slate-500 mb-6">
-                                    Define cuántos días puede estar una iniciativa en un mismo estado antes de cambiar de color en el semáforo visual.
-                                </p>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl">
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-amber-400" />
-                                            Días para Alerta Amarilla
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                                value={tempYellow}
-                                                onChange={(e) => setTempYellow(parseInt(e.target.value) || 1)}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-red-500" />
-                                            Días para Alerta Roja (Crítica)
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="number"
-                                                min="2"
-                                                className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                                value={tempRed}
-                                                onChange={(e) => setTempRed(parseInt(e.target.value) || 1)}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-8 flex justify-end">
-                                    <button
-                                        onClick={async () => {
-                                            try {
-                                                await actualizarUmbrales(tempYellow, tempRed);
-                                                alert("Umbrales actualizados correctamente.");
-                                            } catch (e: any) {
-                                                alert("Error al actualizar umbrales: " + e.message);
-                                            }
-                                        }}
-                                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm"
-                                    >
-                                        <Save size={16} /> Guardar Configuración
-                                    </button>
-                                </div>
-                            </div>
                         </div>
                     )}
                 </div>

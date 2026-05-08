@@ -23,11 +23,12 @@ export const appSettingsApi = {
         }
     },
 
-    async obtenerUmbralesEstatus(): Promise<{ yellow: number, red: number }> {
+    async obtenerUmbralesEstatus(espacioId: string): Promise<{ yellow: number, red: number }> {
         try {
             const { data, error } = await supabase
                 .from('app_settings')
                 .select('id, value')
+                .eq('espacio_id', espacioId)
                 .in('id', ['status_threshold_yellow', 'status_threshold_red']);
 
             if (error) throw error;
@@ -45,12 +46,12 @@ export const appSettingsApi = {
         }
     },
 
-    async actualizarUmbralesEstatus(yellow: number, red: number): Promise<void> {
+    async actualizarUmbralesEstatus(espacioId: string, yellow: number, red: number): Promise<void> {
         const { error } = await supabase
             .from('app_settings')
             .upsert([
-                { id: 'status_threshold_yellow', value: yellow.toString(), updated_at: new Date().toISOString() },
-                { id: 'status_threshold_red', value: red.toString(), updated_at: new Date().toISOString() }
+                { id: 'status_threshold_yellow', espacio_id: espacioId, value: yellow.toString(), updated_at: new Date().toISOString() },
+                { id: 'status_threshold_red', espacio_id: espacioId, value: red.toString(), updated_at: new Date().toISOString() }
             ]);
 
         if (error) throw error;

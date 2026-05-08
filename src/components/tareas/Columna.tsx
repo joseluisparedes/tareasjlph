@@ -19,6 +19,7 @@ interface ColumnaProps {
     onViewLogs: (tareaId: string) => void;
     usuarios: any[];
     isMaster?: boolean;
+    canEdit?: boolean;
 }
 
 export const Columna: React.FC<ColumnaProps> = ({ 
@@ -33,7 +34,8 @@ export const Columna: React.FC<ColumnaProps> = ({
     onRegisterInitiative,
     onViewLogs,
     usuarios = [],
-    isMaster = false
+    isMaster = false,
+    canEdit = true
 }) => {
     const { user } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
@@ -67,6 +69,8 @@ export const Columna: React.FC<ColumnaProps> = ({
         setIsEditing(false);
     };
 
+    const canUserEdit = canEdit || isMaster;
+    
     return (
         <div
             ref={setNodeRef}
@@ -76,7 +80,7 @@ export const Columna: React.FC<ColumnaProps> = ({
             <div
                 {...attributes}
                 {...(isProtected ? {} : listeners)}
-                className={`p-3 border-b rounded-t-xl flex justify-between items-center group ${isProtected ? 'bg-indigo-100/80 border-indigo-200 cursor-default' : 'bg-slate-50 border-slate-200 cursor-grab active:cursor-grabbing'}`}
+                className={`p-3 border-b rounded-t-xl flex justify-between items-center group ${isProtected ? 'bg-indigo-100/80 border-indigo-200 cursor-default' : (canUserEdit ? 'bg-slate-50 border-slate-200 cursor-grab active:cursor-grabbing' : 'bg-slate-50 border-slate-200 cursor-default')}`}
             >
                 {isEditing ? (
                     <input 
@@ -100,7 +104,7 @@ export const Columna: React.FC<ColumnaProps> = ({
                         </span>
                     </h3>
                 )}
-                {isOwner && (
+                {canEdit && (
                     <div className="relative" onPointerDown={e => e.stopPropagation()}>
                         <button 
                             onClick={() => setShowMenu(!showMenu)}
@@ -149,11 +153,12 @@ export const Columna: React.FC<ColumnaProps> = ({
                             onViewLogs={onViewLogs}
                             usuarios={usuarios}
                             isMaster={isMaster}
+                            canEdit={canEdit}
                         />
                     ))}
                 </SortableContext>
                 
-                {isOwner && (
+                {canEdit && (
                     <button 
                         onClick={() => onAddTarea(columna.id)}
                         className="w-full mt-2 flex items-center justify-center gap-1 py-2 text-sm text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent border-dashed hover:border-blue-200"

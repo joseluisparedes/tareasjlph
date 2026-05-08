@@ -27,6 +27,7 @@ export interface Solicitud {
     complejidad: string | null;
     ingresado_gestion_demanda: string | null;
     ultimo_cambio_estado?: string | null;
+    orden?: number;
 }
 
 export interface Dominio {
