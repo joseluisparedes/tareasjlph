@@ -31,13 +31,28 @@ export function useCatalogoConfig() {
 
     const setModo = async (tipo: CatalogType, modo: 'desplegable' | 'cuadros') => {
         if (!workspaceId) return;
-        await catalogoConfigApi.upsert(tipo, modo, workspaceId);
+        const currentVisible = getVisible(tipo);
+        await catalogoConfigApi.upsert(tipo, modo, workspaceId, currentVisible);
         setConfigs(prev => {
             const existe = prev.find(c => c.tipo === tipo);
             if (existe) return prev.map(c => c.tipo === tipo ? { ...c, modo_visualizacion: modo } : c);
-            return [...prev, { tipo, modo_visualizacion: modo, espacio_id: workspaceId }];
+            return [...prev, { tipo, modo_visualizacion: modo, es_visible: currentVisible, espacio_id: workspaceId }];
         });
     };
 
-    return { configs, getModo, setModo };
+    const getVisible = (tipo: CatalogType): boolean =>
+        configs.find(c => c.tipo === tipo)?.es_visible ?? true;
+
+    const setVisible = async (tipo: CatalogType, visible: boolean) => {
+        if (!workspaceId) return;
+        const currentModo = getModo(tipo);
+        await catalogoConfigApi.upsert(tipo, currentModo, workspaceId, visible);
+        setConfigs(prev => {
+            const existe = prev.find(c => c.tipo === tipo);
+            if (existe) return prev.map(c => c.tipo === tipo ? { ...c, es_visible: visible } : c);
+            return [...prev, { tipo, modo_visualizacion: currentModo, es_visible: visible, espacio_id: workspaceId }];
+        });
+    };
+
+    return { configs, getModo, setModo, getVisible, setVisible };
 }

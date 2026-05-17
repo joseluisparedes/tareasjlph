@@ -1,20 +1,64 @@
 import React, { useState } from 'react';
 import { useTareas } from '../../hooks/useTareas';
+import { useUsuarios } from '../../hooks/useUsuarios';
 import { Loader2, Search, ArrowUpDown, Trash2, RotateCcw } from 'lucide-react';
+
+type SortableField = 'titulo' | 'descripcion' | 'responsable' | 'urgencia' | 'fecha_creacion' | 'fecha_actualizacion';
 
 export const TareasList: React.FC = () => {
     const { tareas, cargando, eliminarTarea, actualizarTarea } = useTareas();
+    const { usuarios } = useUsuarios();
     const [searchTerm, setSearchTerm] = useState('');
     const [urgencyFilter, setUrgencyFilter] = useState<string>('Todas');
+    const [responsableFilter, setResponsableFilter] = useState<string>('Todos');
+
+    // Estado para ordenación
+    const [sortField, setSortField] = useState<SortableField>('fecha_actualizacion');
+    const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
     const tareasTerminadas = tareas.filter(t => t.estado === 'Terminada');
+
+    const handleSort = (field: SortableField) => {
+        if (sortField === field) {
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
+        }
+    };
 
     const filteredTareas = tareasTerminadas.filter(t => {
         const matchesSearch = t.titulo.toLowerCase().includes(searchTerm.toLowerCase()) || 
                               (t.descripcion?.toLowerCase() || '').includes(searchTerm.toLowerCase());
         const matchesUrgency = urgencyFilter === 'Todas' || t.urgencia === urgencyFilter;
-        return matchesSearch && matchesUrgency;
-    }).sort((a,b) => new Date(b.fecha_actualizacion).getTime() - new Date(a.fecha_actualizacion).getTime());
+        const matchesResponsable = responsableFilter === 'Todos' || t.responsable_id === responsableFilter;
+        return matchesSearch && matchesUrgency && matchesResponsable;
+    }).sort((a, b) => {
+        let comparison = 0;
+        if (sortField === 'titulo') {
+            comparison = a.titulo.localeCompare(b.titulo);
+        } else if (sortField === 'descripcion') {
+            comparison = (a.descripcion || '').localeCompare(b.descripcion || '');
+        } else if (sortField === 'responsable') {
+            const nameA = usuarios.find(u => u.id === a.responsable_id)?.nombre_completo || '';
+            const nameB = usuarios.find(u => u.id === b.responsable_id)?.nombre_completo || '';
+            comparison = nameA.localeCompare(nameB);
+        } else if (sortField === 'urgencia') {
+            const urgencyWeight = { 'Verde': 1, 'Amarillo': 2, 'Rojo': 3 };
+            const weightA = urgencyWeight[a.urgencia as 'Verde' | 'Amarillo' | 'Rojo'] || 0;
+            const weightB = urgencyWeight[b.urgencia as 'Verde' | 'Amarillo' | 'Rojo'] || 0;
+            comparison = weightA - weightB;
+        } else if (sortField === 'fecha_creacion') {
+            const timeA = new Date(a.fecha_creacion || 0).getTime();
+            const timeB = new Date(b.fecha_creacion || 0).getTime();
+            comparison = timeA - timeB;
+        } else if (sortField === 'fecha_actualizacion') {
+            const timeA = new Date(a.fecha_actualizacion).getTime();
+            const timeB = new Date(b.fecha_actualizacion).getTime();
+            comparison = timeA - timeB;
+        }
+        return sortDirection === 'asc' ? comparison : -comparison;
+    });
 
     const getUrgencyBadge = (urgencia: string) => {
         switch (urgencia) {
@@ -41,6 +85,12 @@ export const TareasList: React.FC = () => {
         }
     };
 
+    const getHeaderClass = (field: SortableField) => {
+        return `px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer hover:bg-slate-100 transition-colors select-none ${
+            sortField === field ? 'text-blue-600 bg-slate-50/80' : 'text-slate-500'
+        }`;
+    };
+
     return (
         <div className="h-full flex flex-col bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-4 border-b border-slate-100 bg-slate-50 flex gap-4 items-center flex-wrap">
@@ -57,6 +107,20 @@ export const TareasList: React.FC = () => {
                     />
                 </div>
                 
+                <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-500 font-medium">Responsable:</span>
+                    <select
+                        value={responsableFilter}
+                        onChange={e => setResponsableFilter(e.target.value)}
+                        className="text-sm border border-slate-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 max-w-[200px] truncate"
+                    >
+                        <option value="Todos">Todos</option>
+                        {usuarios.map(u => (
+                            <option key={u.id} value={u.id}>{u.nombre_completo}</option>
+                        ))}
+                    </select>
+                </div>
+
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-slate-500 font-medium">Urgencia:</span>
                     <select
@@ -82,11 +146,43 @@ export const TareasList: React.FC = () => {
                     <table className="min-w-full divide-y divide-slate-200">
                         <thead className="bg-slate-50 sticky top-0">
                             <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Tarea</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Descripción</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Urgencia</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Fecha Terminación</th>
-                                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Acciones</th>
+                                <th scope="col" onClick={() => handleSort('titulo')} className={getHeaderClass('titulo')}>
+                                    <div className="flex items-center gap-1.5">
+                                        Tarea
+                                        <ArrowUpDown size={13} className={`transition-transform duration-200 ${sortField === 'titulo' ? (sortDirection === 'desc' ? 'rotate-180 text-blue-600' : 'text-blue-600') : 'text-slate-400 opacity-60'}`} />
+                                    </div>
+                                </th>
+                                <th scope="col" onClick={() => handleSort('descripcion')} className={getHeaderClass('descripcion')}>
+                                    <div className="flex items-center gap-1.5">
+                                        Descripción
+                                        <ArrowUpDown size={13} className={`transition-transform duration-200 ${sortField === 'descripcion' ? (sortDirection === 'desc' ? 'rotate-180 text-blue-600' : 'text-blue-600') : 'text-slate-400 opacity-60'}`} />
+                                    </div>
+                                </th>
+                                <th scope="col" onClick={() => handleSort('responsable')} className={getHeaderClass('responsable')}>
+                                    <div className="flex items-center gap-1.5">
+                                        Responsable
+                                        <ArrowUpDown size={13} className={`transition-transform duration-200 ${sortField === 'responsable' ? (sortDirection === 'desc' ? 'rotate-180 text-blue-600' : 'text-blue-600') : 'text-slate-400 opacity-60'}`} />
+                                    </div>
+                                </th>
+                                <th scope="col" onClick={() => handleSort('urgencia')} className={getHeaderClass('urgencia')}>
+                                    <div className="flex items-center gap-1.5">
+                                        Urgencia
+                                        <ArrowUpDown size={13} className={`transition-transform duration-200 ${sortField === 'urgencia' ? (sortDirection === 'desc' ? 'rotate-180 text-blue-600' : 'text-blue-600') : 'text-slate-400 opacity-60'}`} />
+                                    </div>
+                                </th>
+                                <th scope="col" onClick={() => handleSort('fecha_creacion')} className={getHeaderClass('fecha_creacion')}>
+                                    <div className="flex items-center gap-1.5">
+                                        Fecha Creación
+                                        <ArrowUpDown size={13} className={`transition-transform duration-200 ${sortField === 'fecha_creacion' ? (sortDirection === 'desc' ? 'rotate-180 text-blue-600' : 'text-blue-600') : 'text-slate-400 opacity-60'}`} />
+                                    </div>
+                                </th>
+                                <th scope="col" onClick={() => handleSort('fecha_actualizacion')} className={getHeaderClass('fecha_actualizacion')}>
+                                    <div className="flex items-center gap-1.5">
+                                        Fecha Terminación
+                                        <ArrowUpDown size={13} className={`transition-transform duration-200 ${sortField === 'fecha_actualizacion' ? (sortDirection === 'desc' ? 'rotate-180 text-blue-600' : 'text-blue-600') : 'text-slate-400 opacity-60'}`} />
+                                    </div>
+                                </th>
+                                <th scope="col" className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider select-none">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-slate-200">
@@ -98,8 +194,14 @@ export const TareasList: React.FC = () => {
                                     <td className="px-6 py-4">
                                         <div className="text-sm text-slate-500 line-clamp-2 max-w-md">{tarea.descripcion || '-'}</div>
                                     </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                                        {usuarios.find(u => u.id === tarea.responsable_id)?.nombre_completo || 'Sin asignar'}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         {getUrgencyBadge(tarea.urgencia)}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                                        {tarea.fecha_creacion ? new Date(tarea.fecha_creacion).toLocaleDateString() : '-'}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                                         {new Date(tarea.fecha_actualizacion).toLocaleDateString()}

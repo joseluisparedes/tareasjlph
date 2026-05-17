@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { CatalogItem, CatalogoItem, CatalogType, User, ITRequest } from '../../types';
-import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, Edit2, Save, X, Plus, Tag, LayoutGrid, List, GripVertical, ChevronDown, Users, Settings, Briefcase } from 'lucide-react';
+import { CatalogItem, CatalogoItem, CatalogType, User, ITRequest, WorkspaceMember } from '../../types';
+import { Shield, Trash2, UserPlus, FolderPlus, AlertTriangle, AlertCircle, Edit2, Save, X, Plus, Tag, LayoutGrid, List, GripVertical, ChevronDown, Users, Settings, Briefcase, Eye, EyeOff } from 'lucide-react';
 import { useUsuarios } from '../../hooks/useUsuarios';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import { useCatalogoConfig } from '../../hooks/useCatalogoConfig';
 import { useWorkspaces } from '../../hooks/useWorkspaces';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -21,9 +22,15 @@ interface AdminPanelProps {
     getModo: (tipo: CatalogType) => 'desplegable' | 'cuadros';
     setModo: (tipo: CatalogType, modo: 'desplegable' | 'cuadros') => void;
     requests: ITRequest[];
+    // Sincronización de configuración de campos
+    importFields: string[];
+    exportFields: string[];
+    actualizarConfigCampos: (tipo: 'import' | 'export', campos: string[]) => Promise<void>;
+    umbrales: { yellow: number, red: number };
+    actualizarUmbrales: (yellow: number, red: number) => Promise<void>;
 }
 
-type AdminTab = 'catalogs' | 'users' | 'workspaces' | 'settings';
+type AdminTab = 'catalogs' | 'users' | 'workspaces' | 'settings' | 'import_export';
 
 const CATALOG_SECTIONS: { tipo: CatalogType; label: string }[] = [
     { tipo: 'dominios', label: 'Dominios TI' },
@@ -40,6 +47,31 @@ const CATALOG_SECTIONS: { tipo: CatalogType; label: string }[] = [
     { tipo: 'complejidad', label: 'Complejidad' },
     { tipo: 'ingresado_gestion_demanda', label: 'Ingresado en Gestión de la Demanda' },
     { tipo: 'tipo_actividad_calendario', label: 'Tipo de Actividad Calendario' },
+    { tipo: 'es_proyecto_spo', label: '¿Es proyecto SPO?' },
+    { tipo: 'id_demanda', label: 'ID de la demanda' },
+];
+
+const AVAILABLE_FIELDS = [
+    { id: 'id', label: 'ID Iniciativa' },
+    { id: 'titulo', label: 'Título' },
+    { id: 'descripcion', label: 'Descripción' },
+    { id: 'solicitante', label: 'Solicitante' },
+    { id: 'direccion_solicitante', label: 'Dirección Solicitante' },
+    { id: 'brm', label: 'BRM' },
+    { id: 'institucion', label: 'Institución' },
+    { id: 'dominio', label: 'Dominio TI' },
+    { id: 'urgencia', label: 'Urgencia' },
+    { id: 'estado', label: 'Estado' },
+    { id: 'prioridad', label: 'Prioridad' },
+    { id: 'tipo_tarea', label: 'Tipo de Tarea' },
+    { id: 'complejidad', label: 'Complejidad' },
+    { id: 'ingresado_gestion_demanda', label: 'Ingresado GD' },
+    { id: 'es_proyecto_spo', label: '¿Es proyecto SPO?' },
+    { id: 'id_demanda', label: 'ID de la demanda' },
+    { id: 'fecha_inicio', label: 'Fecha Inicio' },
+    { id: 'fecha_fin', label: 'Fecha Fin' },
+    { id: 'asignado_a', label: 'Asignado a' },
+    { id: 'id_externo', label: 'ID Externo' },
 ];
 
 // ─── Componente Sortable para un Item de Catálogo ────────────────────────────
@@ -119,6 +151,120 @@ const SortableCatalogItemRow: React.FC<{
     );
 };
 
+// ─── Componentes Sortable para Importación y Exportación ─────────────────────
+
+const SortableFieldItem = ({ id, label, isChecked, onToggle, type }: { id: string, label: string, isChecked: boolean, onToggle: (checked: boolean) => void, type: 'import' | 'export' }) => {
+    const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: `${type}-${id}` });
+
+    const style: React.CSSProperties = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 1 : 'auto',
+        position: 'relative'
+    };
+
+    return (
+        <div ref={setNodeRef} style={style} className={`flex items-center gap-3 p-2.5 rounded-lg border transition-all group ${isChecked ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+            {isChecked ? (
+                <button {...attributes} {...listeners} className="cursor-grab text-slate-300 hover:text-slate-500 p-0.5 rounded hover:bg-slate-100 shrink-0">
+                    <GripVertical size={14} />
+                </button>
+            ) : (
+                <div className="w-[18px]" /> // placeholder
+            )}
+            <input 
+                type="checkbox"
+                className={`w-4 h-4 rounded focus:ring-2 border-slate-300 ${type === 'import' ? 'text-indigo-600 focus:ring-indigo-500' : 'text-emerald-600 focus:ring-emerald-500'}`}
+                checked={isChecked}
+                onChange={(e) => onToggle(e.target.checked)}
+            />
+            <span className="text-sm font-medium text-slate-600 group-hover:text-slate-900">{label}</span>
+        </div>
+    );
+};
+
+const FieldListConfig = ({ type, fields, setFields }: { type: 'import'|'export', fields: string[], setFields: (fields: string[]) => void }) => {
+    const sensors = useSensors(
+        useSensor(PointerSensor),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    );
+
+    // Los campos seleccionados, en el orden de `fields`
+    const selectedFields = fields.map(id => AVAILABLE_FIELDS.find(f => f.id === id)).filter(Boolean) as typeof AVAILABLE_FIELDS;
+    
+    // Los campos no seleccionados
+    const unselectedFields = AVAILABLE_FIELDS.filter(f => !fields.includes(f.id));
+
+    const handleDragEnd = (event: DragEndEvent) => {
+        const { active, over } = event;
+        if (active.id !== over?.id) {
+            // El ID del draggable viene como `${type}-${id}`, extraemos solo el ID real
+            const activeId = (active.id as string).replace(`${type}-`, '');
+            const overId = (over?.id as string).replace(`${type}-`, '');
+            
+            const oldIndex = fields.indexOf(activeId);
+            const newIndex = fields.indexOf(overId);
+            
+            if (oldIndex !== -1 && newIndex !== -1) {
+                const newFields = arrayMove(fields, oldIndex, newIndex);
+                setFields(newFields);
+            }
+        }
+    };
+
+    const handleToggle = (id: string, checked: boolean) => {
+        if (checked) {
+            setFields([...fields, id]);
+        } else {
+            setFields(fields.filter(f => f !== id));
+        }
+    };
+
+    return (
+        <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 flex flex-col max-h-[500px] overflow-y-auto">
+            <h5 className="text-xs font-bold text-slate-500 uppercase mb-3">Campos Seleccionados (Arrastra para ordenar)</h5>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={selectedFields.map(f => `${type}-${f.id}`)} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2 mb-6">
+                        {selectedFields.length === 0 && <p className="text-xs text-slate-400 italic">No hay campos seleccionados</p>}
+                        {selectedFields.map(field => (
+                            <SortableFieldItem 
+                                key={field.id} 
+                                id={field.id} 
+                                label={field.label} 
+                                isChecked={true} 
+                                onToggle={(c) => handleToggle(field.id, c)} 
+                                type={type} 
+                            />
+                        ))}
+                    </div>
+                </SortableContext>
+            </DndContext>
+
+            {unselectedFields.length > 0 && (
+                <>
+                    <h5 className="text-xs font-bold text-slate-500 uppercase mb-3">Campos Disponibles</h5>
+                    <div className="space-y-2">
+                        {unselectedFields.map(field => (
+                            <div key={field.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-slate-100 bg-white opacity-60 hover:opacity-100 transition-opacity">
+                                <div className="w-[22px]" />
+                                <input 
+                                    type="checkbox"
+                                    className={`w-4 h-4 rounded focus:ring-2 border-slate-300 ${type === 'import' ? 'text-indigo-600 focus:ring-indigo-500' : 'text-emerald-600 focus:ring-emerald-500'}`}
+                                    checked={false}
+                                    onChange={(e) => handleToggle(field.id, e.target.checked)}
+                                />
+                                <span className="text-sm font-medium text-slate-600">{field.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
+
 // ─── Sub-componente: lista de un catálogo ───────────────────────────────────
 const CatalogSection: React.FC<{
     tipo: CatalogType;
@@ -129,8 +275,10 @@ const CatalogSection: React.FC<{
     onUpdate: (id: string, cambios: Partial<Pick<CatalogoItem, 'valor' | 'esta_activo' | 'color' | 'abreviatura' | 'orden'>>) => void;
     onDelete: (id: string) => void;
     onToggleModo: () => void;
+    esVisible: boolean;
+    onToggleVisible: (visible: boolean) => void;
     requests: ITRequest[];
-}> = ({ tipo, label, items, modo, onAdd, onUpdate, onDelete, onToggleModo, requests }) => {
+}> = ({ tipo, label, items, modo, onAdd, onUpdate, onDelete, onToggleModo, esVisible, onToggleVisible, requests }) => {
     const [adding, setAdding] = useState(false);
     const [newVal, setNewVal] = useState('');
     const [newAbrev, setNewAbrev] = useState('');
@@ -186,25 +334,41 @@ const CatalogSection: React.FC<{
                 </div>
                 <div className="flex items-center gap-2">
                     {/* Toggle modo visualización */}
+                    {tipo !== 'id_demanda' && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onToggleModo(); }}
+                            title={modo === 'desplegable' ? 'Cambiar a cuadros de selección rápida' : 'Cambiar a lista desplegable'}
+                            className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${modo === 'cuadros'
+                                ? 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'
+                                : 'bg-slate-100 border-slate-300 text-slate-500 hover:bg-slate-200'
+                                }`}
+                        >
+                            {modo === 'cuadros' ? <LayoutGrid size={11} /> : <List size={11} />}
+                            {modo === 'cuadros' ? 'Cuadros' : 'Desplegable'}
+                        </button>
+                    )}
+                    {/* Toggle Visibilidad */}
                     <button
-                        onClick={(e) => { e.stopPropagation(); onToggleModo(); }}
-                        title={modo === 'desplegable' ? 'Cambiar a cuadros de selección rápida' : 'Cambiar a lista desplegable'}
-                        className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${modo === 'cuadros'
-                            ? 'bg-violet-50 border-violet-300 text-violet-700 hover:bg-violet-100'
-                            : 'bg-slate-100 border-slate-300 text-slate-500 hover:bg-slate-200'
+                        onClick={(e) => { e.stopPropagation(); onToggleVisible(!esVisible); }}
+                        title={esVisible ? 'Ocultar este campo en el formulario y tabla' : 'Mostrar este campo'}
+                        className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${esVisible
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-700 hover:bg-emerald-100'
+                            : 'bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100'
                             }`}
                     >
-                        {modo === 'cuadros' ? <LayoutGrid size={11} /> : <List size={11} />}
-                        {modo === 'cuadros' ? 'Cuadros' : 'Desplegable'}
+                        {esVisible ? <Eye size={11} /> : <EyeOff size={11} />}
+                        {esVisible ? 'Visible' : 'Oculto'}
                     </button>
-                    <button onClick={(e) => { e.stopPropagation(); setAdding(true); setIsExpanded(true); }}
-                        className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
-                        <Plus size={12} /> Agregar
-                    </button>
+                    {tipo !== 'id_demanda' && (
+                        <button onClick={(e) => { e.stopPropagation(); setAdding(true); setIsExpanded(true); }}
+                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-medium">
+                            <Plus size={12} /> Agregar
+                        </button>
+                    )}
                 </div>
             </div>
 
-            {isExpanded && (
+            {isExpanded && tipo !== 'id_demanda' && (
                 <>
                     {adding && (
                         <div className="px-4 py-3 bg-blue-50 border-b border-slate-200 space-y-2">
@@ -280,7 +444,9 @@ const CatalogSection: React.FC<{
 export const AdminPanel: React.FC<AdminPanelProps> = ({
     domains, users: initialUsers, onUpdateDomain, onAddDomain, onDeleteDomain,
     catalogos, onAddCatalogo, onUpdateCatalogo, onDeleteCatalogo,
-    getModo, setModo, requests
+    getModo, setModo, requests,
+    importFields, exportFields, actualizarConfigCampos,
+    umbrales, actualizarUmbrales
 }) => {
     const { 
         workspaces, 
@@ -292,7 +458,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         removerMiembro 
     } = useWorkspaces();
     const { usuarios, cargando: cargandoUsuarios, actualizarUsuario, eliminarUsuario } = useUsuarios({ global: true });
-    const { permitirRegistro, actualizarPermisoRegistro, umbrales, actualizarUmbrales, cargando: cargandoSettings } = useAppSettings(currentWorkspace?.id);
+    const { 
+        permitirRegistro, actualizarPermisoRegistro, cargando: cargandoSettings 
+    } = useAppSettings(currentWorkspace?.id);
+    const { getModo: hookGetModo, setModo: hookSetModo, getVisible: hookGetVisible, setVisible: hookSetVisible } = useCatalogoConfig();
     const [activeTab, setActiveTab] = useState<AdminTab>('catalogs');
     const [isThresholdsOpen, setIsThresholdsOpen] = useState(false);
     
@@ -372,6 +541,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         { id: 'catalogs', label: 'Catálogos' },
         { id: 'users', label: 'Usuarios Globales' },
         { id: 'workspaces', label: 'Espacios de Trabajo' },
+        { id: 'import_export', label: 'Importación / Exportación' },
         { id: 'settings', label: 'Configuración' },
     ];
 
@@ -433,7 +603,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                             tipo="dominios"
                                             label="Dominios TI"
                                             items={domainItems}
-                                            modo={getModo('dominios')}
+                                            modo={hookGetModo('dominios')}
                                             onAdd={(_, val) => onAddDomain(val)}
                                             onUpdate={(id, cambios) => {
                                                 const d = domains.find(x => x.id === id);
@@ -446,7 +616,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                                 });
                                             }}
                                             onDelete={onDeleteDomain || (() => {})}
-                                            onToggleModo={() => setModo('dominios', getModo('dominios') === 'desplegable' ? 'cuadros' : 'desplegable')}
+                                            onToggleModo={() => hookSetModo('dominios', hookGetModo('dominios') === 'desplegable' ? 'cuadros' : 'desplegable')}
+                                            esVisible={hookGetVisible('dominios')}
+                                            onToggleVisible={(v) => hookSetVisible('dominios', v)}
                                             requests={requests}
                                         />
                                     );
@@ -459,11 +631,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                         tipo={tipo}
                                         label={label}
                                         items={catalogos.filter(c => c.tipo === tipo)}
-                                        modo={getModo(tipo)}
+                                        modo={hookGetModo(tipo)}
                                         onAdd={onAddCatalogo}
                                         onUpdate={onUpdateCatalogo}
                                         onDelete={onDeleteCatalogo}
-                                        onToggleModo={() => setModo(tipo, getModo(tipo) === 'desplegable' ? 'cuadros' : 'desplegable')}
+                                        onToggleModo={() => hookSetModo(tipo, hookGetModo(tipo) === 'desplegable' ? 'cuadros' : 'desplegable')}
+                                        esVisible={hookGetVisible(tipo)}
+                                        onToggleVisible={(v) => hookSetVisible(tipo, v)}
                                         requests={requests}
                                     />
                                 );
@@ -828,6 +1002,80 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                                             ))}
                                         </tbody>
                                     </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ── TAB: Importación / Exportación ── */}
+                    {activeTab === 'import_export' && (
+                        <div className="space-y-8">
+                            <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                                <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                                    <h3 className="font-bold text-slate-800 flex items-center gap-2 text-lg">
+                                        <Briefcase className="text-blue-600" size={20} /> Configuración de Campos (Importar/Exportar)
+                                    </h3>
+                                    <p className="text-sm text-slate-500 mt-1">
+                                        Selecciona qué campos deben ser procesados por la aplicación masiva y cuáles deben incluirse en las exportaciones.
+                                        Esta configuración es específica para <b>{currentWorkspace?.nombre}</b>.
+                                    </p>
+                                </div>
+
+                                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-10">
+                                    {/* Configuración Importación */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="font-bold text-slate-700 flex items-center gap-2">
+                                                <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                                                    <LayoutGrid size={16} />
+                                                </div>
+                                                Campos para Importación
+                                            </h4>
+                                            <button 
+                                                onClick={() => actualizarConfigCampos('import', AVAILABLE_FIELDS.map(f => f.id))}
+                                                className="text-[10px] font-bold text-blue-600 uppercase hover:underline"
+                                            >
+                                                Seleccionar Todos
+                                            </button>
+                                        </div>
+                                        <FieldListConfig 
+                                            type="import" 
+                                            fields={importFields} 
+                                            setFields={(f) => actualizarConfigCampos('import', f)} 
+                                        />
+                                        <p className="mt-3 text-[11px] text-slate-400 italic">Los campos seleccionados serán los únicos que el sistema intentará leer desde el Excel/CSV al importar. El orden en que aparecen arriba será el orden esperado en el archivo.</p>
+                                    </div>
+
+                                    {/* Configuración Exportación */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-4">
+                                            <h4 className="font-bold text-slate-700 flex items-center gap-2">
+                                                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                                                    <List size={16} />
+                                                </div>
+                                                Campos para Exportación
+                                            </h4>
+                                            <button 
+                                                onClick={() => actualizarConfigCampos('export', AVAILABLE_FIELDS.map(f => f.id))}
+                                                className="text-[10px] font-bold text-blue-600 uppercase hover:underline"
+                                            >
+                                                Seleccionar Todos
+                                            </button>
+                                        </div>
+                                        <FieldListConfig 
+                                            type="export" 
+                                            fields={exportFields} 
+                                            setFields={(f) => actualizarConfigCampos('export', f)} 
+                                        />
+                                        <p className="mt-3 text-[11px] text-slate-400 italic">Solo estos campos aparecerán en el archivo generado al exportar a CSV o Excel, exactamente en el orden configurado arriba.</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="px-6 py-4 bg-blue-50 border-t border-blue-100 flex items-center gap-3">
+                                    <AlertCircle size={18} className="text-blue-500" />
+                                    <p className="text-xs text-blue-700 font-medium">
+                                        <b>Nota:</b> El campo "ID Iniciativa" es altamente recomendado para exportaciones que planeas volver a importar (para actualizaciones).
+                                    </p>
                                 </div>
                             </div>
                         </div>

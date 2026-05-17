@@ -37,7 +37,9 @@ export type CatalogType =
     | 'tipo_tarea'
     | 'complejidad'
     | 'ingresado_gestion_demanda'
-    | 'tipo_actividad_calendario';
+    | 'tipo_actividad_calendario'
+    | 'es_proyecto_spo'
+    | 'id_demanda';
 
 export interface User {
     id: string;
@@ -76,6 +78,8 @@ export interface ITRequest {
     complejidad?: string;
     ingresadoGestionDemanda?: string;
     ultimoCambioEstado?: string;
+    esProyectoSpo?: string;
+    idDemanda?: string;
     orden?: number;
 }
 
@@ -100,6 +104,7 @@ export interface CatalogoItem {
 export interface CatalogoConfig {
     tipo: CatalogType;
     modo_visualizacion: 'desplegable' | 'cuadros';
+    es_visible?: boolean;
     espacio_id?: string;
 }
 
@@ -113,8 +118,13 @@ export interface FilterState {
     status: string[];
     direction: string[]; // Nueva propiedad
     requester: string[]; // Nueva propiedad
-    ingresadoGestionDemanda: string[]; // Nueva propiedad
-    brm: string[]; // Nueva propiedad
+    brm: string[];
+    ingresadoGestionDemanda: string[];
+    esProyectoSpo: string[];
+    idDemanda: string[];
+    institucion: string[];
+    tipoTarea: string[];
+    complejidad: string[];
     search: string;
     onlyMine: boolean;
     assigneeIds: string[];

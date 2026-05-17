@@ -11,13 +11,14 @@ export const catalogoConfigApi = {
         return (data ?? []) as CatalogoConfig[];
     },
 
-    async upsert(tipo: CatalogType, modo: 'desplegable' | 'cuadros', espacioId: string): Promise<void> {
+    async upsert(tipo: CatalogType, modo: 'desplegable' | 'cuadros', espacioId: string, esVisible: boolean = true): Promise<void> {
         const { error } = await supabase
             .from('catalogo_config')
             .upsert({ 
                 tipo, 
                 espacio_id: espacioId,
                 modo_visualizacion: modo, 
+                es_visible: esVisible,
                 fecha_actualizacion: new Date().toISOString() 
             });
         if (error) throw error;

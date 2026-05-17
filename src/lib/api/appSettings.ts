@@ -47,14 +47,33 @@ export const appSettingsApi = {
     },
 
     async actualizarUmbralesEstatus(espacioId: string, yellow: number, red: number): Promise<void> {
-        const { error } = await supabase
-            .from('app_settings')
-            .upsert([
-                { id: 'status_threshold_yellow', espacio_id: espacioId, value: yellow.toString(), updated_at: new Date().toISOString() },
-                { id: 'status_threshold_red', espacio_id: espacioId, value: red.toString(), updated_at: new Date().toISOString() }
-            ]);
+        const updateOrInsert = async (id: string, value: string) => {
+            const { data: existing } = await supabase
+                .from('app_settings')
+                .select('id')
+                .eq('id', id)
+                .eq('espacio_id', espacioId)
+                .maybeSingle();
 
-        if (error) throw error;
+            if (existing) {
+                const { error } = await supabase
+                    .from('app_settings')
+                    .update({ value, updated_at: new Date().toISOString() })
+                    .eq('id', id)
+                    .eq('espacio_id', espacioId);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from('app_settings')
+                    .insert({ id, espacio_id: espacioId, value, updated_at: new Date().toISOString() });
+                if (error) throw error;
+            }
+        };
+
+        await Promise.all([
+            updateOrInsert('status_threshold_yellow', yellow.toString()),
+            updateOrInsert('status_threshold_red', red.toString())
+        ]);
     },
 
     async actualizarPermisoRegistro(permitir: boolean): Promise<void> {
@@ -67,5 +86,75 @@ export const appSettingsApi = {
             });
 
         if (error) throw error;
+    },
+
+    async obtenerConfigCampos(espacioId: string, tipo: 'import' | 'export'): Promise<string[]> {
+        try {
+            const id = tipo === 'import' ? 'import_fields_config' : 'export_fields_config';
+            const { data, error } = await supabase
+                .from('app_settings')
+                .select('value')
+                .eq('id', id)
+                .eq('espacio_id', espacioId)
+                .maybeSingle();
+
+            if (error) throw error;
+            if (data?.value) {
+                let val = data.value;
+                if (typeof val === 'string') {
+                    try {
+                        val = JSON.parse(val);
+                    } catch (e) {
+                        return [];
+                    }
+                }
+                if (Array.isArray(val)) {
+                    return val;
+                }
+            }
+            return []; // Por defecto vacío
+        } catch (e) {
+            console.error(`Error al obtener config de ${tipo}:`, e);
+            return [];
+        }
+    },
+
+    async actualizarConfigCampos(espacioId: string, tipo: 'import' | 'export', campos: string[]): Promise<void> {
+        const id = tipo === 'import' ? 'import_fields_config' : 'export_fields_config';
+        
+        const { data: existing } = await supabase
+            .from('app_settings')
+            .select('id')
+            .eq('id', id)
+            .eq('espacio_id', espacioId)
+            .maybeSingle();
+
+        if (existing) {
+            const { error } = await supabase
+                .from('app_settings')
+                .update({
+                    value: JSON.stringify(campos),
+                    updated_at: new Date().toISOString()
+                })
+                .eq('id', id)
+                .eq('espacio_id', espacioId);
+            if (error) {
+                console.error(`Error al actualizar config de ${tipo}:`, error);
+                throw error;
+            }
+        } else {
+            const { error } = await supabase
+                .from('app_settings')
+                .insert({
+                    id,
+                    espacio_id: espacioId,
+                    value: JSON.stringify(campos),
+                    updated_at: new Date().toISOString()
+                });
+            if (error) {
+                console.error(`Error al insertar config de ${tipo}:`, error);
+                throw error;
+            }
+        }
     }
 };

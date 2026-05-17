@@ -19,6 +19,7 @@ interface RequestModalProps {
     historialFechas?: SolicitudFecha[];
     umbrales?: { yellow: number, red: number };
     getModo?: (tipo: CatalogType) => 'desplegable' | 'cuadros';
+    getVisible?: (tipo: CatalogType) => boolean;
     canEditExternal?: boolean;
 }
 
@@ -29,7 +30,7 @@ const inputClass = "mt-1 block w-full rounded-md border-slate-300 shadow-sm focu
 const labelClass = "block text-xs font-semibold text-slate-600 uppercase tracking-wide";
 
 export const RequestModal: React.FC<RequestModalProps> = ({
-    isOpen, onClose, request, onSave, onDelete, domains, catalogos, historialFechas = [], umbrales, getModo, canEditExternal = false
+    isOpen, onClose, request, onSave, onDelete, domains, catalogos, historialFechas = [], umbrales, getModo, getVisible, canEditExternal = false
 }) => {
     const { perfil, user, esAdministrador } = useAuth();
     
@@ -71,8 +72,9 @@ export const RequestModal: React.FC<RequestModalProps> = ({
     const complejidades = getCats('complejidad');
     const ingresadoGestionDemanda = getCats('ingresado_gestion_demanda');
 
-    // Modos
+    // Modos y Visibilidad
     const getM = (t: CatalogType) => getModo?.(t) ?? 'desplegable';
+    const isV = (t: CatalogType) => getVisible?.(t) ?? true;
 
     const [formData, setFormData] = useState<Partial<ITRequest>>({});
     const [isSavingRequest, setIsSavingRequest] = useState(false);
@@ -611,29 +613,50 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                         )}
                                     </div>
 
-                                    <SelectorCampo label="Tipo Requerimiento" required
-                                        valor={formData.type || ''} onChange={v => set('type', v)} disabled={isReadOnly}
-                                        opciones={tiposReq} modo={getM('tipo_requerimiento')} />
-
-                                    <SelectorCampo label="Urgencia" required
-                                        valor={formData.urgency || ''} onChange={v => set('urgency', v)} disabled={isReadOnly}
-                                        opciones={urgencias} modo={getM('urgencia')} />
+                                    {isV('tipo_requerimiento') && (
+                                        <SelectorCampo label="Tipo Requerimiento" required
+                                            valor={formData.type || ''} onChange={v => set('type', v)} disabled={isReadOnly}
+                                            opciones={tiposReq} modo={getM('tipo_requerimiento')} />
+                                    )}
+                                    {isV('urgencia') && (
+                                        <SelectorCampo label="Urgencia" required
+                                            valor={formData.urgency || ''} onChange={v => set('urgency', v)} disabled={isReadOnly}
+                                            opciones={urgencias} modo={getM('urgencia')} />
+                                    )}
 
                                     <SelectorCampo label="Estado" required
                                         valor={formData.status || ''} onChange={v => set('status', v)} disabled={isReadOnly}
                                         opciones={estados} modo={getM('estado')} />
 
-                                    <SelectorCampo label="Complejidad"
-                                        valor={formData.complejidad || ''} onChange={v => set('complejidad', v)} disabled={isReadOnly}
-                                        opciones={complejidades} modo={getM('complejidad')} />
+                                    {isV('complejidad') && (
+                                        <SelectorCampo label="Complejidad"
+                                            valor={formData.complejidad || ''} onChange={v => set('complejidad', v)} disabled={isReadOnly}
+                                            opciones={complejidades} modo={getM('complejidad')} />
+                                    )}
 
-                                    <SelectorCampo label="Tipo de Tarea"
-                                        valor={formData.tipoTarea || ''} onChange={v => set('tipoTarea', v)} disabled={isReadOnly}
-                                        opciones={tiposTarea} modo={getM('tipo_tarea')} />
-
-                                    <SelectorCampo label="Ingresado en Gestión de la Demanda"
-                                        valor={formData.ingresadoGestionDemanda || ''} onChange={v => set('ingresadoGestionDemanda', v)} disabled={isReadOnly}
-                                        opciones={ingresadoGestionDemanda} modo={getM('ingresado_gestion_demanda')} />
+                                    {isV('tipo_tarea') && (
+                                        <SelectorCampo label="Tipo de Tarea"
+                                            valor={formData.tipoTarea || ''} onChange={v => set('tipoTarea', v)} disabled={isReadOnly}
+                                            opciones={tiposTarea} modo={getM('tipo_tarea')} />
+                                    )}
+                                    {isV('ingresado_gestion_demanda') && (
+                                        <SelectorCampo label="Ingresado en Gestión de la Demanda"
+                                            valor={formData.ingresadoGestionDemanda || ''} onChange={v => set('ingresadoGestionDemanda', v)} disabled={isReadOnly}
+                                            opciones={ingresadoGestionDemanda} modo={getM('ingresado_gestion_demanda')} />
+                                    )}
+                                    {isV('es_proyecto_spo') && (
+                                        <SelectorCampo label="¿Es proyecto SPO?"
+                                            valor={formData.esProyectoSpo || ''} onChange={v => set('esProyectoSpo', v)} disabled={isReadOnly}
+                                            opciones={getCats('es_proyecto_spo')} modo={getM('es_proyecto_spo')} />
+                                    )}
+                                    {isV('id_demanda') && (
+                                        <div className="col-span-6 sm:col-span-2">
+                                            <label className={labelClass}>ID de la demanda</label>
+                                            <input type="text" className={inputClass} disabled={isReadOnly}
+                                                value={formData.idDemanda || ''} onChange={e => set('idDemanda', e.target.value)}
+                                                placeholder="Ej: DEM-1234..." />
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -656,17 +679,23 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                         <div className="-mt-14 opacity-0 pointer-events-none absolute"><input required disabled={isReadOnly} /> {/* Hack validación HTML5 si hidden */} </div>
                                     )}
 
-                                    <SelectorCampo label="Dirección Solicitante" required
-                                        valor={formData.direccionSolicitante || ''} onChange={v => set('direccionSolicitante', v)} disabled={isReadOnly}
-                                        opciones={direcciones} modo={getM('direccion_solicitante')} />
+                                    {isV('direccion_solicitante') && (
+                                        <SelectorCampo label="Dirección Solicitante" required
+                                            valor={formData.direccionSolicitante || ''} onChange={v => set('direccionSolicitante', v)} disabled={isReadOnly}
+                                            opciones={direcciones} modo={getM('direccion_solicitante')} />
+                                    )}
 
-                                    <SelectorCampo label="Institución"
-                                        valor={formData.institucion || ''} onChange={v => set('institucion', v)} disabled={isReadOnly}
-                                        opciones={instituciones} modo={getM('institucion')} />
+                                    {isV('institucion') && (
+                                        <SelectorCampo label="Institución"
+                                            valor={formData.institucion || ''} onChange={v => set('institucion', v)} disabled={isReadOnly}
+                                            opciones={instituciones} modo={getM('institucion')} />
+                                    )}
 
-                                    <SelectorCampo label="BRM" required
-                                        valor={formData.brm || ''} onChange={v => set('brm', v)} disabled={isReadOnly}
-                                        opciones={brms} modo={getM('brm')} />
+                                    {isV('brm') && (
+                                        <SelectorCampo label="BRM" required
+                                            valor={formData.brm || ''} onChange={v => set('brm', v)} disabled={isReadOnly}
+                                            opciones={brms} modo={getM('brm')} />
+                                    )}
                                 </div>
                             </div>
 
@@ -683,10 +712,12 @@ export const RequestModal: React.FC<RequestModalProps> = ({
                                         valor={formData.assigneeId || ''} onChange={v => set('assigneeId', v || null)} disabled={isReadOnly}
                                         opciones={asignados} modo={getM('asignado_a')} placeholder="-- Sin asignar --" />
 
-                                    <SelectorCampo label="Prioridad"
-                                        valor={formData.priority || ''} onChange={v => set('priority', v)} disabled={isReadOnly}
-                                        opciones={prioridades} modo={getM('prioridad')}
-                                        placeholder={prioridades.length === 0 ? "Ej: P-001" : "-- Selecciona --"} />
+                                    {isV('prioridad') && (
+                                        <SelectorCampo label="Prioridad"
+                                            valor={formData.priority || ''} onChange={v => set('priority', v)} disabled={isReadOnly}
+                                            opciones={prioridades} modo={getM('prioridad')}
+                                            placeholder={prioridades.length === 0 ? "Ej: P-001" : "-- Selecciona --"} />
+                                    )}
                                     <div className="col-span-6 sm:col-span-2">
                                         <label className={labelClass}>Tarea SN</label>
                                         <input type="text" className={inputClass} disabled={isReadOnly}

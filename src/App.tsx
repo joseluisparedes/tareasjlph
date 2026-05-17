@@ -55,6 +55,8 @@ function adaptarSolicitud(s: any, dominios: Dominio[]): ITRequest {
         tipoTarea: s.tipo_tarea ?? undefined,
         complejidad: s.complejidad ?? undefined,
         ingresadoGestionDemanda: s.ingresado_gestion_demanda ?? undefined,
+        esProyectoSpo: s.es_proyecto_spo ?? undefined,
+        idDemanda: s.id_demanda ?? undefined,
         ultimoCambioEstado: s.ultimo_cambio_estado ?? undefined,
         orden: s.orden ?? undefined,
     };
@@ -108,8 +110,8 @@ export default function App() {
     const { actividades } = useCalendario();
 
     const { workspaces, currentWorkspace, setCurrentWorkspace, cargando: cargandoWorkspaces, canEditIniciativas } = useWorkspaces();
-    const { getModo, setModo } = useCatalogoConfig();
-    const { umbrales, actualizarUmbrales } = useAppSettings(currentWorkspace?.id);
+    const { getModo, setModo, getVisible } = useCatalogoConfig();
+    const { umbrales, actualizarUmbrales, importFields, exportFields, actualizarConfigCampos } = useAppSettings(currentWorkspace?.id);
 
     const handleDeleteRequest = (id: string) => {
         setDeleteConfirmId(id);
@@ -218,6 +220,7 @@ export default function App() {
             { field: 'tipoTarea', type: 'tipo_tarea' },
             { field: 'complejidad', type: 'complejidad' },
             { field: 'ingresadoGestionDemanda', type: 'ingresado_gestion_demanda' },
+            { field: 'esProyectoSpo', type: 'es_proyecto_spo' },
             // Estado y Prioridad suelen ser más estáticos, pero si se permite edición libre:
             { field: 'status', type: 'estado' },
             { field: 'priority', type: 'prioridad' },
@@ -273,6 +276,8 @@ export default function App() {
             tipo_tarea: req.tipoTarea || null,
             complejidad: req.complejidad || null,
             ingresado_gestion_demanda: req.ingresadoGestionDemanda || null,
+            es_proyecto_spo: req.esProyectoSpo || null,
+            id_demanda: req.idDemanda || null,
             orden: req.orden || 0,
         };
 
@@ -326,6 +331,8 @@ export default function App() {
             tipo_tarea: req.tipoTarea || null,
             complejidad: req.complejidad || null,
             ingresado_gestion_demanda: req.ingresadoGestionDemanda || null,
+            es_proyecto_spo: req.esProyectoSpo || null,
+            id_demanda: req.idDemanda || null,
         };
 
         const nueva = await crearSolicitud(datos);
@@ -375,6 +382,7 @@ export default function App() {
             { field: 'tipoTarea', type: 'tipo_tarea' },
             { field: 'complejidad', type: 'complejidad' },
             { field: 'ingresadoGestionDemanda', type: 'ingresado_gestion_demanda' },
+            { field: 'esProyectoSpo', type: 'es_proyecto_spo' },
             { field: 'priority', type: 'prioridad' },
             { field: 'status', type: 'estado' },
         ];
@@ -440,7 +448,9 @@ export default function App() {
                 institucion: req.institucion || null,
                 tipo_tarea: req.tipoTarea || null,
                 complejidad: req.complejidad || null,
-                ingresado_gestion_demanda: req.ingresadoGestionDemanda || null
+                ingresado_gestion_demanda: req.ingresadoGestionDemanda || null,
+                es_proyecto_spo: req.esProyectoSpo || null,
+                id_demanda: req.idDemanda || null
             });
         }
     };
@@ -472,6 +482,8 @@ export default function App() {
         if (data.fechaFin !== undefined) updateData.fecha_fin = data.fechaFin;
         if (data.direccionSolicitante !== undefined) updateData.direccion_solicitante = data.direccionSolicitante;
         if (data.ingresadoGestionDemanda !== undefined) updateData.ingresado_gestion_demanda = data.ingresadoGestionDemanda;
+        if (data.esProyectoSpo !== undefined) updateData.es_proyecto_spo = data.esProyectoSpo;
+        if (data.idDemanda !== undefined) updateData.id_demanda = data.idDemanda;
 
         // El historial de fechas es manejado por un trigger en el backend de Supabase.
         await actualizarSolicitud(id, updateData);
@@ -642,6 +654,8 @@ export default function App() {
                                 onUpdateRequest={handleUpdateRequest}
                                 umbrales={umbrales}
                                 canEdit={canEditIniciativas()}
+                                getVisible={getVisible}
+                                exportFields={exportFields}
                             />
                         )}
                         {vistaSegura === 'Tareas' && (
@@ -691,7 +705,10 @@ export default function App() {
                                 setModo={setModo}
                                 requests={requests}
                                 umbrales={umbrales}
-                                onUpdateUmbrales={actualizarUmbrales}
+                                actualizarUmbrales={actualizarUmbrales}
+                                importFields={importFields}
+                                exportFields={exportFields}
+                                actualizarConfigCampos={actualizarConfigCampos}
                             />
                         )}
                         {vistaSegura === 'Reports' && (
@@ -704,6 +721,8 @@ export default function App() {
                                 domains={domains}
                                 catalogos={catalogos}
                                 getModo={getModo}
+                                importFields={importFields}
+                                exportFields={exportFields}
                             />
                         )}
                         {vistaSegura === 'Alertas' && (
@@ -751,6 +770,7 @@ export default function App() {
                 catalogos={catalogos}
                 historialFechas={historialFechas}
                 getModo={getModo}
+                getVisible={getVisible}
                 canEditExternal={canEditIniciativas()}
             />
         </div>

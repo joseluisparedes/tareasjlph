@@ -27,6 +27,8 @@ export interface Solicitud {
     complejidad: string | null;
     ingresado_gestion_demanda: string | null;
     ultimo_cambio_estado?: string | null;
+    es_proyecto_spo: string | null;
+    id_demanda: string | null;
     orden?: number;
 }
 

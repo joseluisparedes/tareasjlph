@@ -8,6 +8,7 @@ interface MultiSelectDropdownProps {
     onChange: (selected: string[]) => void;
     placeholder?: string;
     className?: string;
+    icon?: React.ReactNode;
 }
 
 export function MultiSelectDropdown({
@@ -16,7 +17,8 @@ export function MultiSelectDropdown({
     selected,
     onChange,
     placeholder = 'Seleccionar...',
-    className = ''
+    className = '',
+    icon
 }: MultiSelectDropdownProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -55,10 +57,12 @@ export function MultiSelectDropdown({
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center justify-between w-full min-w-[140px] border border-slate-300 rounded-md px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white hover:bg-slate-50 transition-colors text-sm text-left"
+                className="flex items-center justify-between w-full border border-slate-200 rounded-lg px-2 py-1 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-400 bg-white hover:bg-slate-50 transition-all text-sm text-left shadow-sm h-10"
             >
-                <div className="flex flex-col flex-1 overflow-hidden pr-2">
-                    <span className="text-[10px] uppercase font-semibold text-slate-500 leading-none mb-0.5">{label}</span>
+                <div className="flex items-center gap-2 flex-1 overflow-hidden">
+                    {icon && <div className="text-slate-400 shrink-0">{icon}</div>}
+                    <div className="flex flex-col flex-1 min-w-0 pr-1">
+                        <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider leading-none mb-1 truncate">{label}</span>
                     <span className="truncate leading-tight text-xs">
                         {selected.length === 0
                             ? placeholder
@@ -66,22 +70,23 @@ export function MultiSelectDropdown({
                                 ? selected[0]
                                 : `${selected.length} seleccionados`}
                     </span>
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                    {selected.length > 0 && (
-                        <div
-                            onClick={clearSelection}
-                            className="p-0.5 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
-                        >
-                            <X size={12} />
-                        </div>
-                    )}
-                    <ChevronDown size={14} className="text-slate-400" />
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                        {selected.length > 0 && (
+                            <div
+                                onClick={clearSelection}
+                                className="p-0.5 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                            >
+                                <X size={12} />
+                            </div>
+                        )}
+                        <ChevronDown size={14} className="text-slate-400" />
+                    </div>
                 </div>
             </button>
 
             {isOpen && (
-                <div className="absolute z-50 w-64 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl top-full left-0 max-h-80 flex flex-col">
+                <div className="absolute z-50 w-72 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl top-full left-0 max-h-[400px] flex flex-col animate-in fade-in zoom-in duration-200 overflow-hidden">
                     {options.length > 5 && (
                         <div className="p-2 border-b border-slate-100 shrink-0">
                             <div className="relative">
@@ -111,10 +116,10 @@ export function MultiSelectDropdown({
                                     <div
                                         key={option}
                                         onClick={() => toggleOption(option)}
-                                        className={`flex items-start gap-2 px-2 py-1.5 rounded cursor-pointer text-sm transition-colors ${isSelected ? 'bg-blue-50 text-blue-700' : 'hover:bg-slate-50 text-slate-700'
+                                        className={`flex items-start gap-3 px-3 py-2 rounded-xl cursor-pointer text-sm transition-all ${isSelected ? 'bg-blue-50 text-blue-700 font-semibold' : 'hover:bg-slate-50 text-slate-600'
                                             }`}
                                     >
-                                        <div className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center border shrink-0 transition-colors ${isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 bg-white'
+                                        <div className={`mt-0.5 w-4 h-4 rounded-md flex items-center justify-center border shrink-0 transition-all ${isSelected ? 'bg-blue-600 border-blue-600 text-white shadow-sm scale-110' : 'border-slate-300 bg-white'
                                             }`}>
                                             {isSelected && <Check size={12} strokeWidth={3} />}
                                         </div>

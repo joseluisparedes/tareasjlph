@@ -19,6 +19,8 @@ interface RequestTableProps {
     domains?: CatalogItem[];
     catalogos?: CatalogoItem[];
     canEdit?: boolean;
+    getVisible?: (tipo: string) => boolean;
+    exportFields?: string[];
 }
 
 const PriorityBadge: React.FC<{ priority: string; catalogos?: CatalogoItem[] }> = ({ priority, catalogos }) => {
@@ -148,7 +150,7 @@ const SortableHeader: React.FC<SortableHeaderProps> = ({ id, children, onClick, 
     );
 };
 
-export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, onDelete, onDeleteBulk, catalogosUrgencia, onUpdateRequest, domains, catalogos, canEdit: canEditExternal = false }) => {
+export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, onDelete, onDeleteBulk, catalogosUrgencia, onUpdateRequest, domains, catalogos, canEdit: canEditExternal = false, getVisible, exportFields }) => {
     const { user, esAdministrador } = useAuth();
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
@@ -272,6 +274,9 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
         if (key === 'ingresadoGestionDemanda') {
             return catalogos?.filter(c => c.tipo === 'ingresado_gestion_demanda' && c.esta_activo).map(c => ({ value: c.valor, label: c.valor })) || [];
         }
+        if (key === 'esProyectoSpo') {
+            return catalogos?.filter(c => c.tipo === 'es_proyecto_spo' && c.esta_activo).map(c => ({ value: c.valor, label: c.valor })) || [];
+        }
         return [];
     };
 
@@ -358,25 +363,31 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
     };
 
     // Definición de todas las columnas posibles
-    const allColumns: (ColumnConfig & { id: string })[] = [
-        { id: 'id', key: 'id' as keyof ITRequest, label: 'ID', sortable: true, editable: false },
-        {
-            id: 'apuntes', key: 'id' as keyof ITRequest, label: 'Apuntes y Actualizaciones', sortable: false, editable: false,
-            render: (req) => <NotesCell requestId={req.id} canEdit={esAdministrador || req.creadorId === user?.id || canEditExternal} />
-        },
-        {
-            id: 'title', key: 'title', label: 'Título', sortable: true, editable: true, inputType: 'text',
-            render: (req) => (
-                editingCell?.id === req.id && editingCell.field === 'title' ? null : // Don't render custom if editing
-                    <div className="flex flex-col w-full">
-                        <span className="font-medium text-slate-800 break-words leading-snug">{req.title}</span>
-                        {req.externalId && <span className="text-[11px] text-indigo-500/80 truncate mt-0.5">🔗 {req.externalId}</span>}
-                    </div>
-            )
-        },
-        { id: 'domain', key: 'domain', label: 'Dominio TI', sortable: true, editable: true, inputType: 'select' },
-        { id: 'type', key: 'type', label: 'Tipo', sortable: true, editable: true, inputType: 'select' },
-        {
+    const allColumns: (ColumnConfig & { id: string })[] = useMemo(() => {
+        const isV = (t: string) => getVisible?.(t) ?? true;
+
+        const cols: (ColumnConfig & { id: string })[] = [
+            { id: 'id', key: 'id' as keyof ITRequest, label: 'ID', sortable: true, editable: false },
+            {
+                id: 'apuntes', key: 'id' as keyof ITRequest, label: 'Apuntes y Actualizaciones', sortable: false, editable: false,
+                render: (req) => <NotesCell requestId={req.id} canEdit={esAdministrador || req.creadorId === user?.id || canEditExternal} />
+            },
+            {
+                id: 'title', key: 'title', label: 'Título', sortable: true, editable: true, inputType: 'text',
+                render: (req) => (
+                    editingCell?.id === req.id && editingCell.field === 'title' ? null : // Don't render custom if editing
+                        <div className="flex flex-col w-full">
+                            <span className="font-medium text-slate-800 break-words leading-snug">{req.title}</span>
+                            {req.externalId && <span className="text-[11px] text-indigo-500/80 truncate mt-0.5">🔗 {req.externalId}</span>}
+                        </div>
+                )
+            },
+            { id: 'domain', key: 'domain', label: 'Dominio TI', sortable: true, editable: true, inputType: 'select' },
+        ];
+
+        if (isV('tipo_requerimiento')) cols.push({ id: 'type', key: 'type', label: 'Tipo', sortable: true, editable: true, inputType: 'select' });
+        
+        cols.push({
             id: 'status', key: 'status', label: 'Estado', sortable: true, editable: true, inputType: 'select',
             render: (req) => (
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium border ${req.status === 'En ejecución' ? 'bg-blue-50/50 text-blue-700 border-blue-200' :
@@ -387,31 +398,41 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
                     {req.status}
                 </span>
             )
-        },
-        {
+        });
+
+        if (isV('urgencia')) cols.push({
             id: 'urgency', key: 'urgency', label: 'Urgencia', sortable: true, editable: true, inputType: 'select',
             render: (req) => <PriorityBadge priority={req.urgency} catalogos={catalogosUrgencia} />
-        },
-        { id: 'prioridad', key: 'priority' as keyof ITRequest, label: 'Prioridad', sortable: true, editable: true, inputType: 'text' },
-        { id: 'ingresadoGestionDemanda', key: 'ingresadoGestionDemanda' as keyof ITRequest, label: 'Ing. Gestión Demanda', sortable: true, editable: true, inputType: 'select' },
-        { id: 'tipoTarea', key: 'tipoTarea' as keyof ITRequest, label: 'Tipo Tarea', sortable: true, editable: true, inputType: 'select' },
-        { id: 'tareaSN', key: 'tareaSN' as keyof ITRequest, label: 'Tarea SN', sortable: true, editable: true, inputType: 'text' },
-        { id: 'ticketRIT', key: 'ticketRIT' as keyof ITRequest, label: 'Ticket RIT', sortable: true, editable: true, inputType: 'text' },
-        {
+        });
+
+        if (isV('prioridad')) cols.push({ id: 'prioridad', key: 'priority' as keyof ITRequest, label: 'Prioridad', sortable: true, editable: true, inputType: 'text' });
+        if (isV('ingresado_gestion_demanda')) cols.push({ id: 'ingresadoGestionDemanda', key: 'ingresadoGestionDemanda' as keyof ITRequest, label: 'Ing. Gestión Demanda', sortable: true, editable: true, inputType: 'select' });
+        if (isV('es_proyecto_spo')) cols.push({ id: 'esProyectoSpo', key: 'esProyectoSpo' as keyof ITRequest, label: '¿Es proyecto SPO?', sortable: true, editable: true, inputType: 'select' });
+        if (isV('id_demanda')) cols.push({ id: 'idDemanda', key: 'idDemanda' as keyof ITRequest, label: 'ID de Demanda', sortable: true, editable: true, inputType: 'text' });
+        if (isV('tipo_tarea')) cols.push({ id: 'tipoTarea', key: 'tipoTarea' as keyof ITRequest, label: 'Tipo Tarea', sortable: true, editable: true, inputType: 'select' });
+        
+        cols.push({ id: 'tareaSN', key: 'tareaSN' as keyof ITRequest, label: 'Tarea SN', sortable: true, editable: true, inputType: 'text' });
+        cols.push({ id: 'ticketRIT', key: 'ticketRIT' as keyof ITRequest, label: 'Ticket RIT', sortable: true, editable: true, inputType: 'text' });
+        
+        cols.push({
             id: 'fechaInicio', key: 'fechaInicio' as keyof ITRequest, label: 'Fecha Inicio', sortable: true, editable: true, inputType: 'date',
             render: (req) => formatDate(req.fechaInicio as string | undefined)
-        },
-        {
+        });
+        cols.push({
             id: 'fechaFin', key: 'fechaFin' as keyof ITRequest, label: 'Fecha Fin', sortable: true, editable: true, inputType: 'date',
             render: (req) => formatDate(req.fechaFin as string | undefined)
-        },
-        { id: 'requester', key: 'requester', label: 'Solicitante', sortable: true, editable: true, inputType: 'select' },
-        { id: 'direccionSolicitante', key: 'direccionSolicitante', label: 'Dirección de Solicitante', sortable: true, editable: true, inputType: 'select' },
-        {
-            id: 'assigneeId', key: 'assigneeId', label: 'Asignado', sortable: true, editable: false, // Could be select if we had users list
+        });
+
+        if (isV('usuario_solicitante')) cols.push({ id: 'requester', key: 'requester', label: 'Solicitante', sortable: true, editable: true, inputType: 'select' });
+        if (isV('direccion_solicitante')) cols.push({ id: 'direccionSolicitante', key: 'direccionSolicitante', label: 'Dirección de Solicitante', sortable: true, editable: true, inputType: 'select' });
+        
+        cols.push({
+            id: 'assigneeId', key: 'assigneeId', label: 'Asignado', sortable: true, editable: false,
             render: (req) => req.assigneeId ? <span className="text-slate-700">{req.assigneeId}</span> : <span className="text-slate-400 italic">Sin asignar</span>
-        },
-    ];
+        });
+
+        return cols;
+    }, [getVisible, esAdministrador, user?.id, canEditExternal, editingCell, catalogosUrgencia, requests]);
 
     // Configuración de Visibilidad de Columnas
     const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => {
@@ -485,29 +506,61 @@ export const RequestTable: React.FC<RequestTableProps> = ({ requests, onEdit, on
     };
 
     const handleExport = () => {
-        // Filtrar datos visibles (solo columnas visibles y orden actual)
-        // Usamos sortedRequests que ya tiene el filtro de ordenamiento de filas
+        const fieldMapping: Record<string, { label: string, getValue: (req: ITRequest) => any }> = {
+            'id': { label: 'ID Iniciativa', getValue: req => req.id },
+            'titulo': { label: 'Título', getValue: req => req.title },
+            'descripcion': { label: 'Descripción', getValue: req => req.description },
+            'solicitante': { label: 'Solicitante', getValue: req => req.requester },
+            'direccion_solicitante': { label: 'Dirección Solicitante', getValue: req => req.direccionSolicitante },
+            'brm': { label: 'BRM', getValue: req => req.brm },
+            'institucion': { label: 'Institución', getValue: req => req.institucion },
+            'dominio': { label: 'Dominio TI', getValue: req => req.domain },
+            'urgencia': { label: 'Urgencia', getValue: req => req.urgency },
+            'estado': { label: 'Estado', getValue: req => req.status },
+            'prioridad': { label: 'Prioridad', getValue: req => req.priority },
+            'tipo_tarea': { label: 'Tipo de Tarea', getValue: req => req.tipoTarea },
+            'complejidad': { label: 'Complejidad', getValue: req => req.complejidad },
+            'ingresado_gestion_demanda': { label: 'Ingresado GD', getValue: req => req.ingresadoGestionDemanda },
+            'es_proyecto_spo': { label: '¿Es proyecto SPO?', getValue: req => req.esProyectoSpo },
+            'id_demanda': { label: 'ID de la demanda', getValue: req => req.idDemanda },
+            'fecha_inicio': { label: 'Fecha Inicio', getValue: req => req.fechaInicio },
+            'fecha_fin': { label: 'Fecha Fin', getValue: req => req.fechaFin },
+            'asignado_a': { label: 'Asignado a', getValue: req => req.assigneeId },
+            'id_externo': { label: 'ID Externo', getValue: req => req.externalId },
+            
+            // Compatibilidad y campos adicionales
+            'usuario_solicitante': { label: 'Solicitante', getValue: req => req.requester },
+            'tipo_requerimiento': { label: 'Tipo', getValue: req => req.type },
+            'fecha_creacion': { label: 'Fecha Creación', getValue: req => new Date(req.createdAt).toLocaleDateString() },
+            'tarea_sn': { label: 'Tarea SN', getValue: req => req.tareaSN },
+            'ticket_rit': { label: 'Ticket RIT', getValue: req => req.ticketRIT },
+        };
+
         const dataToExport = sortedRequests.map(req => {
             const row: Record<string, any> = {};
-            columnOrder.forEach(colId => {
-                if (visibleColumns.has(colId)) {
-                    // Mapeo simple para exportación
-                    const colDef = allColumns.find(c => c.id === colId);
-                    if (colDef) {
-                        // Usar etiqueta como header? O key? Usaremos Key.
-                        // Para valores complejos (como objetos), simplificar.
-                        const val = req[colDef.key];
-                        row[colDef.label] = val;
+            if (exportFields && exportFields.length > 0) {
+                exportFields.forEach(field => {
+                    if (fieldMapping[field]) {
+                        row[fieldMapping[field].label] = fieldMapping[field].getValue(req) || '';
                     }
-                }
-            });
+                });
+            } else {
+                columnOrder.forEach(colId => {
+                    if (visibleColumns.has(colId)) {
+                        const colDef = allColumns.find(c => c.id === colId);
+                        if (colDef && colDef.id !== 'actions' && colDef.id !== 'apuntes') {
+                            row[colDef.label] = req[colDef.key as keyof ITRequest];
+                        }
+                    }
+                });
+            }
             return row;
         });
 
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Solicitudes");
-        XLSX.writeFile(workbook, "solicitudes_export.xlsx");
+        XLSX.writeFile(workbook, `solicitudes_export_${new Date().toISOString().slice(0, 10)}.xlsx`);
     };
 
 

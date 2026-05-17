@@ -90,6 +90,13 @@ export const SelectorCampo: React.FC<SelectorCampoProps> = ({
                             </button>
                         );
                     })}
+                    {valor && !listaOpciones.some(op => op.valor === valor) && (
+                        <button key="inactive-val" type="button" disabled
+                            className="px-2.5 py-1 rounded-md text-xs font-semibold border transition-all whitespace-nowrap bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed line-through"
+                            title={`${valor} (Inactivo)`}>
+                            {valor}
+                        </button>
+                    )}
                 </div>
                 {required && !valor && <input type="text" required readOnly value="" className="sr-only" aria-hidden />}
             </div>
@@ -107,7 +114,9 @@ export const SelectorCampo: React.FC<SelectorCampoProps> = ({
                     disabled={disabled}
                     className={`relative w-full cursor-default rounded-md border bg-white py-2 pl-3 pr-10 text-left shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:text-xs ${compact ? 'h-8' : ''} ${!valor ? 'text-slate-500' : 'text-slate-900'} border-slate-300 ${disabled ? 'bg-slate-50 opacity-70 cursor-not-allowed' : ''}`}
                 >
-                    <span className="block truncate">{valor || placeholder}</span>
+                    <span className={`block truncate ${valor && !listaOpciones.some(op => op.valor === valor) ? 'text-slate-400 line-through font-medium' : ''}`}>
+                        {valor ? (listaOpciones.some(op => op.valor === valor) ? valor : `${valor} (Inactivo)`) : placeholder}
+                    </span>
                     <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                         <ChevronsUpDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
                     </span>
